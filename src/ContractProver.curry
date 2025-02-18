@@ -40,6 +40,7 @@ import System.CurryPath                  ( runModuleActionQuiet )
 import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
+import Verification.Run                  ( runVerification )
 
 -- Imports from package modules:
 import ESMT
