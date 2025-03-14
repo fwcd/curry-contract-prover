@@ -40,7 +40,10 @@ import System.CurryPath                  ( runModuleActionQuiet )
 import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
-import Verification.Run                  ( runVerification )
+import Verification.Env                  ( VEnv (..), currentFuncInfo )
+import Verification.Run                  ( runTypedVerification )
+import Verification.ProgInfo             ( VProgInfo (..), emptyVProgInfo )
+import Verification.Types                ( Verification (..) )
 
 -- Imports from package modules:
 import ESMT
@@ -60,7 +63,7 @@ import VerifierState
 banner :: String
 banner = unlines [bannerLine, bannerText, bannerLine]
  where
-  bannerText = "Contract Checking/Verification Tool (Version of 26/10/24)"
+  bannerText = "FuncContracts Checking/Verification Tool (Version of 26/10/24)"
   bannerLine = take (length bannerText) (repeat '=')
 
 -- Path name of the module with auxiliary operations for contract checking.
@@ -90,6 +93,33 @@ main = do
       mapM_ (proveContracts opts') progs
 
 ---------------------------------------------------------------------------
+
+-- TODO: Clean this up/move these types into modules
+
+data FuncContracts = FuncContracts
+  -- TODO: Is String the right type to represent pre-/postconditions here?
+  { fcPreconds  :: [String] -- The contract's preconditions
+  , fcPostconds :: [String] -- The contract's postconditions
+  , fcHold      :: Bool     -- Whether the postconditions hold
+  }
+
+contractProver :: Verification TAProg TAFuncDecl FuncContracts
+contractProver = Verification
+  { initVerify = const . return $ FuncContracts
+    { fcPreconds  = []
+    , fcPostconds = []
+    , fcHold      = False
+    }
+  , verifyFunc = verifyFuncContracts
+  }
+
+verifyFuncContracts :: VEnv TAProg TAFuncDecl FuncContracts -> IO (VProgInfo FuncContracts, FuncContracts)
+verifyFuncContracts env = do
+  -- TODO
+  let fc = currentFuncInfo env
+  return (emptyVProgInfo, fc)
+
+--- Verifies a function's contract.
 
 -- Optimize a module by proving its contracts and remove verified
 -- postconditions or add unverified preconditions.
