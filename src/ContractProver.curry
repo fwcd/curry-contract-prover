@@ -41,7 +41,7 @@ import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
 import Verification.Env                  ( VEnv (..), currentFuncInfo )
-import Verification.Run                  ( runTypedVerification )
+import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.ProgInfo             ( VProgInfo (..), emptyVProgInfo )
 import Verification.Types                ( Verification (..) )
 
