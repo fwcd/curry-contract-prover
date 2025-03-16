@@ -13,7 +13,7 @@
 
 module ContractProver where
 
-import Control.Monad      ( unless, when )
+import Control.Monad      ( unless, when, void )
 import Data.IORef
 import Data.List          ( elemIndex, find, init, isPrefixOf, last, maximum
                           , minimum, nub, partition, splitOn, union )
@@ -43,6 +43,7 @@ import System.Process                    ( exitWith, system )
 import Verification.Env                  ( VEnv (..), currentFuncInfo )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.ProgInfo             ( VProgInfo (..), emptyVProgInfo )
+import Verification.Options              ( VOptions (..), defaultVOptions )
 import Verification.Types                ( Verification (..) )
 
 -- Imports from package modules:
@@ -93,7 +94,7 @@ main = do
 
       -- TODO: Remove this:
       -- mapM_ (proveContracts opts') progs
-      runTypeAnnotatedVerification contractProver
+      void $ runTypeAnnotatedVerification contractProver defaultVOptions
 
 ---------------------------------------------------------------------------
 
