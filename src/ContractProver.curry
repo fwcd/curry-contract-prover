@@ -100,24 +100,24 @@ main = do
 
 -- TODO: Clean this up/move these types into modules
 
-data FuncContracts = FuncContracts
+data ContractInfo = ContractInfo
   -- TODO: Is String the right type to represent pre-/postconditions here?
-  { fcPreconds  :: [String] -- The contract's preconditions
-  , fcPostconds :: [String] -- The contract's postconditions
-  , fcHold      :: Bool     -- Whether the postconditions hold
+  { ciPreconds  :: [String] -- The contract's preconditions
+  , ciPostconds :: [String] -- The contract's postconditions
+  , ciHold      :: Bool     -- Whether the postconditions hold
   }
 
-contractProver :: Verification TAProg TAFuncDecl FuncContracts
+contractProver :: Verification TAProg TAFuncDecl ContractInfo
 contractProver = Verification
-  { initVerify = const . return $ FuncContracts
-    { fcPreconds  = []
-    , fcPostconds = []
-    , fcHold      = False
+  { initVerify = const . return $ ContractInfo
+    { ciPreconds  = []
+    , ciPostconds = []
+    , ciHold      = False
     }
   , verifyFunc = verifyFuncContracts
   }
 
-verifyFuncContracts :: VEnv TAProg TAFuncDecl FuncContracts -> IO (VProgInfo FuncContracts, FuncContracts)
+verifyFuncContracts :: VEnv TAProg TAFuncDecl ContractInfo -> IO (VProgInfo ContractInfo, ContractInfo)
 verifyFuncContracts env = do
   -- TODO
   let fc = currentFuncInfo env
