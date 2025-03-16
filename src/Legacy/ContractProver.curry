@@ -865,13 +865,6 @@ getIncludePath incfile = do
                   "Warning: '" ++ localinclude ++ "' required but not found!"
                 return incfile
 
---- Checks whether a file exists in one of the directories on the PATH.
-fileInPath :: String -> IO Bool
-fileInPath file = do
-  path <- getEnv "PATH"
-  dirs <- return $ splitOn ":" path
-  (fmap (any id)) $ mapM (doesFileExist . (</> file)) dirs
-
 -- Shows a qualified name by replacing all dots by underscores.
 showQNameNoDots :: QName -> String
 showQNameNoDots = map (\c -> if c=='.' then '_' else c) . showQName
