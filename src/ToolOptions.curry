@@ -35,10 +35,11 @@ data Options = Options
                          -- safe and powerful)
   , optNoProof :: Bool   -- do not write scripts of successful proofs
   , optTimeout :: Int    -- timeout (in seconds) for SMT prover
+  , optLegacy  :: Bool   -- use the legacy, non-framework contract-prover
   }
 
 defaultOptions :: Options
-defaultOptions = Options 1 False "" True True False False False 4
+defaultOptions = Options 1 False "" True True False False False 4 False
 
 --- Process the actual command line argument and return the options
 --- and the name of the main program.
