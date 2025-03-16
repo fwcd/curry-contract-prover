@@ -91,10 +91,13 @@ main = do
         , "The SMT solver Z3 is required for the verifier"
         , "but the program 'z3' is not found in the PATH!"]
       let opts' = if z3exists then opts else opts { optVerify = False }
+          vopts = defaultVOptions
+                    { voModules = progs
+                    }
 
       -- TODO: Remove this:
       -- mapM_ (proveContracts opts') progs
-      void $ runTypeAnnotatedVerification contractProver defaultVOptions
+      void $ runTypeAnnotatedVerification contractProver vopts
 
 ---------------------------------------------------------------------------
 
