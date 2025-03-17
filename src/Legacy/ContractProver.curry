@@ -40,11 +40,6 @@ import System.CurryPath                  ( runModuleActionQuiet )
 import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
-import Verification.Env                  ( VEnv (..), currentFuncInfo )
-import Verification.Run                  ( runTypeAnnotatedVerification )
-import Verification.ProgInfo             ( VProgInfo (..), emptyVProgInfo )
-import Verification.Options              ( VOptions (..), defaultVOptions )
-import Verification.Types                ( Verification (..) )
 
 -- Imports from package modules:
 import ESMT
