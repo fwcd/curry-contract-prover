@@ -115,12 +115,14 @@ emptyContractInfo = ContractInfo
   , ciHold      = False
   }
 
+--- The contract prover as a framework verification.
 contractProver :: Verification TAProg TAFuncDecl ContractInfo
 contractProver = Verification
   { initFuncInfo = initFuncContractInfo
   , verifyFunc   = verifyFuncContractInfo
   }
 
+--- Initializes the results for a function by finding all associated pre- and postconditions.
 initFuncContractInfo :: VEnv TAProg TAFuncDecl ContractInfo -> IO ContractInfo
 initFuncContractInfo env = do
   let fdecls          = currentProgFuncs env
@@ -132,6 +134,7 @@ initFuncContractInfo env = do
     , ciPostconds = funcsMatching toPostCondName
     }
 
+--- Verifies a single function declaration by proving the contracts.
 verifyFuncContractInfo :: VEnv TAProg TAFuncDecl ContractInfo -> IO (VResult ContractInfo)
 verifyFuncContractInfo env = do
   let ci = currentFuncInfo env
