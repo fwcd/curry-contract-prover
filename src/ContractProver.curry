@@ -78,9 +78,9 @@ main = do
   let optname = optName opts
   if not (null optname)
     then putStrLn $ "Precondition for '" ++ optname ++ "':\n" ++
-                    encodeContractName (optname ++ "'pre") ++ "\n" ++
+                    encodeContractName (toPreCondName optname) ++ "\n" ++
                     "Postcondition for '" ++ optname ++ "':\n" ++
-                    encodeContractName (optname ++ "'post")
+                    encodeContractName (toPostCondName optname)
     else do
       when (optVerb opts > 0) $ putStrLn banner
       z3exists <- fileInPath "z3"
