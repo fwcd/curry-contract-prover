@@ -40,7 +40,7 @@ import System.CurryPath                  ( runModuleActionQuiet )
 import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
-import Verification.Env                  ( VEnv (..), currentFuncInfo )
+import Verification.Env                  ( VEnv (..), currentFuncInfo, currentFuncName, currentProgFuncs )
 import Verification.Result               ( VResult (..), simpleVResult )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.ProgInfo             ( VProgInfo (..), emptyVProgInfo )
@@ -108,18 +108,32 @@ data ContractInfo = ContractInfo
   , ciHold      :: Bool     -- Whether the postconditions hold
   }
 
-contractProver :: Verification TAProg TAFuncDecl ContractInfo
-contractProver = Verification
-  { initVerify = const . return $ ContractInfo
-    { ciPreconds  = []
-    , ciPostconds = []
-    , ciHold      = False
-    }
-  , verifyFunc = verifyFuncContracts
+emptyContractInfo :: ContractInfo
+emptyContractInfo = ContractInfo
+  { ciPreconds  = []
+  , ciPostconds = []
+  , ciHold      = False
   }
 
-verifyFuncContracts :: VEnv TAProg TAFuncDecl ContractInfo -> IO (VResult ContractInfo)
-verifyFuncContracts env = do
+contractProver :: Verification TAProg TAFuncDecl ContractInfo
+contractProver = Verification
+  { initFuncInfo = initFuncContractInfo
+  , verifyFunc   = verifyFuncContractInfo
+  }
+
+initFuncContractInfo :: VEnv TAProg TAFuncDecl ContractInfo -> IO ContractInfo
+initFuncContractInfo env = do
+  let fdecls          = currentProgFuncs env
+      name            = snd $ currentFuncName env
+      funcsMatching f = filter (== f name) $ snd . funcName <$> fdecls
+
+  return $ emptyContractInfo
+    { ciPreconds  = funcsMatching toPreCondName
+    , ciPostconds = funcsMatching toPostCondName
+    }
+
+verifyFuncContractInfo :: VEnv TAProg TAFuncDecl ContractInfo -> IO (VResult ContractInfo)
+verifyFuncContractInfo env = do
   let ci = currentFuncInfo env
   -- TODO
   return $ simpleVResult ci
