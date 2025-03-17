@@ -40,7 +40,7 @@ import System.CurryPath                  ( runModuleActionQuiet )
 import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
-import Verification.Env                  ( VEnv (..), currentFuncInfo, currentFuncName, currentProgFuncs )
+import Verification.FuncEnv              ( VFuncEnv (..), currentFuncInfo, currentFuncName, currentProgFuncs )
 import Verification.Result               ( VResult (..), simpleVResult )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.ProgInfo             ( VProgInfo (..), emptyVProgInfo )
@@ -123,7 +123,7 @@ contractProver = Verification
   }
 
 --- Initializes the results for a function by finding all associated pre- and postconditions.
-initFuncContractInfo :: VEnv TAProg TAFuncDecl ContractInfo -> IO ContractInfo
+initFuncContractInfo :: VFuncEnv TAProg TAFuncDecl ContractInfo -> IO ContractInfo
 initFuncContractInfo env = do
   let fdecls          = currentProgFuncs env
       name            = snd $ currentFuncName env
@@ -135,7 +135,7 @@ initFuncContractInfo env = do
     }
 
 --- Verifies a single function declaration by proving the contracts.
-verifyFuncContractInfo :: VEnv TAProg TAFuncDecl ContractInfo -> IO (VResult ContractInfo)
+verifyFuncContractInfo :: VFuncEnv TAProg TAFuncDecl ContractInfo -> IO (VResult ContractInfo)
 verifyFuncContractInfo env = do
   let ci = currentFuncInfo env
   -- TODO
