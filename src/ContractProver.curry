@@ -41,6 +41,7 @@ import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
 import Verification.Env                  ( VEnv (..), currentFuncInfo )
+import Verification.Result               ( VResult (..), simpleVResult )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.ProgInfo             ( VProgInfo (..), emptyVProgInfo )
 import Verification.Options              ( VOptions (..), defaultVOptions )
@@ -117,11 +118,11 @@ contractProver = Verification
   , verifyFunc = verifyFuncContracts
   }
 
-verifyFuncContracts :: VEnv TAProg TAFuncDecl ContractInfo -> IO (VProgInfo ContractInfo, ContractInfo)
+verifyFuncContracts :: VEnv TAProg TAFuncDecl ContractInfo -> IO (VResult ContractInfo)
 verifyFuncContracts env = do
+  let ci = currentFuncInfo env
   -- TODO
-  let fc = currentFuncInfo env
-  return (emptyVProgInfo, fc)
+  return $ simpleVResult ci
 
 ---------------------------------------------------------------------------
 -- Auxiliaries:
