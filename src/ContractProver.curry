@@ -40,12 +40,12 @@ import System.CurryPath                  ( runModuleActionQuiet )
 import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
-import Verification.FuncEnv              ( VFuncEnv (..), currentFuncInfo, currentFuncName, currentProgFuncs )
+import Verification.Env                  ( VFuncEnv (..), VProgEnv (..), currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.ProgInfo             ( VProgInfo (..), emptyVProgInfo )
 import Verification.Options              ( VOptions (..), defaultVOptions )
-import Verification.Types                ( Verification (..) )
-import Verification.Update               ( VUpdate (..), simpleVUpdate )
+import Verification.Types                ( Verification (..), emptyVerification )
+import Verification.Update               ( VFuncUpdate (..), VProgUpdate (..), simpleVFuncUpdate, emptyVProgUpdate )
 
 -- Imports from package modules:
 import ESMT
@@ -117,14 +117,31 @@ emptyContractInfo = ContractInfo
 
 --- The contract prover as a framework verification.
 contractProver :: Verification TAProg TAFuncDecl ContractInfo
-contractProver = Verification
-  { initFuncInfo = initFuncContractInfo
-  , verifyFunc   = verifyFuncContractInfo
+contractProver = emptyVerification
+  { preprocessProg = preprocessProgContracts
+  , initFuncInfo   = initFuncContracts
+  , verifyFunc     = verifyFuncContracts
   }
 
+--- Preprocesses a program's contracts.
+preprocessProgContracts :: VProgEnv TAProg TAFuncDecl ContractInfo -> IO (VProgUpdate TAProg)
+preprocessProgContracts env = do
+  let prog = currentProg env
+      errs = checkContractUsage (progName prog)
+             (map (\fd -> (snd (funcName fd), funcType fd)) (progFuncs prog))
+
+  unless (null errs) $ do
+    putStr . unlines $ showOpError <$> errs
+    exitWith 1
+
+  return emptyVProgUpdate
+  where
+    showOpError (qf,err) =
+      snd qf ++ " (module " ++ fst qf ++ "): " ++ err
+
 --- Initializes the results for a function by finding all associated pre- and postconditions.
-initFuncContractInfo :: VFuncEnv TAProg TAFuncDecl ContractInfo -> IO ContractInfo
-initFuncContractInfo env = do
+initFuncContracts :: VFuncEnv TAProg TAFuncDecl ContractInfo -> IO ContractInfo
+initFuncContracts env = do
   let fdecls          = currentProgFuncs env
       name            = snd $ currentFuncName env
       funcsMatching f = filter (== f name) $ snd . funcName <$> fdecls
@@ -135,11 +152,11 @@ initFuncContractInfo env = do
     }
 
 --- Verifies a single function declaration by proving the contracts.
-verifyFuncContractInfo :: VFuncEnv TAProg TAFuncDecl ContractInfo -> IO (VUpdate ContractInfo)
-verifyFuncContractInfo env = do
+verifyFuncContracts :: VFuncEnv TAProg TAFuncDecl ContractInfo -> IO (VFuncUpdate ContractInfo)
+verifyFuncContracts env = do
   let ci = currentFuncInfo env
   -- TODO
-  return $ simpleVUpdate ci
+  return $ simpleVFuncUpdate ci
 
 ---------------------------------------------------------------------------
 -- Auxiliaries:
