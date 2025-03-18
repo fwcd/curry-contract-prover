@@ -41,11 +41,11 @@ import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
 import Verification.FuncEnv              ( VFuncEnv (..), currentFuncInfo, currentFuncName, currentProgFuncs )
-import Verification.Result               ( VResult (..), simpleVResult )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.ProgInfo             ( VProgInfo (..), emptyVProgInfo )
 import Verification.Options              ( VOptions (..), defaultVOptions )
 import Verification.Types                ( Verification (..) )
+import Verification.Update               ( VUpdate (..), simpleVUpdate )
 
 -- Imports from package modules:
 import ESMT
@@ -135,11 +135,11 @@ initFuncContractInfo env = do
     }
 
 --- Verifies a single function declaration by proving the contracts.
-verifyFuncContractInfo :: VFuncEnv TAProg TAFuncDecl ContractInfo -> IO (VResult ContractInfo)
+verifyFuncContractInfo :: VFuncEnv TAProg TAFuncDecl ContractInfo -> IO (VUpdate ContractInfo)
 verifyFuncContractInfo env = do
   let ci = currentFuncInfo env
   -- TODO
-  return $ simpleVResult ci
+  return $ simpleVUpdate ci
 
 ---------------------------------------------------------------------------
 -- Auxiliaries:
