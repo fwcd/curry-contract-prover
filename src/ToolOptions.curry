@@ -72,6 +72,8 @@ options =
            "do not verify contracts, just add contract checks"
   , Option "s" ["strict"] (NoArg (\opts -> opts { optStrict = True }))
            "check contracts w.r.t. strict evaluation strategy"
+  , Option "l" ["legacy"] (NoArg (\opts -> opts { optLegacy = True }))
+           "use the legacy (non-framework) implementation"
   , Option "t" ["target"]
             (ReqArg checkTarget "<T>")
            ("target of the transformed program:\n" ++
