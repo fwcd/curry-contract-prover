@@ -40,13 +40,13 @@ import System.CurryPath                  ( runModuleActionQuiet )
 import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
-import Verification.Env                  ( TVFuncEnv, TVProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs )
+import Verification.Env                  ( TVFuncEnv, TVProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, infoToEnv, debugToEnv )
 import Verification.Log                  ( printLog )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.Options              ( VOptions (..), defaultVOptions )
 import Verification.Monad                ( VM, throwVM )
 import Verification.Types                ( TVerification, Verification (..), emptyVerification )
-import Verification.Update               ( TVFuncUpdate, TVProgUpdate, simpleVFuncUpdate, emptyVProgUpdate )
+import Verification.Update               ( TVFuncUpdate, TVProgUpdate, simpleVFuncUpdate, emptyVProgUpdate, emptyVFuncUpdate )
 
 -- Imports from package modules:
 import ESMT
@@ -161,9 +161,37 @@ initFuncContracts env = do
 --- Verifies a single function declaration by proving the contracts.
 verifyFuncContracts :: TVFuncEnv ContractInfo -> VM (TVFuncUpdate ContractInfo)
 verifyFuncContracts env = do
-  ci <- currentFuncInfo env
-  -- TODO
-  return $ simpleVFuncUpdate ci
+  case snd $ currentFuncName env of
+    name | isPreCondName  name -> verifyPreCondition  env
+         | isPostCondName name -> verifyPostCondition env
+         | otherwise           -> return emptyVFuncUpdate
+
+---------------------------------------------------------------------------
+-- Try to verify preconditions: If an operation `f` occurring in some
+-- right-hand side has a precondition, a proof for the validity of
+-- this precondition is extracted.
+-- If the proof is not successful, a precondition check is added to this call.
+
+verifyPreCondition :: TVFuncEnv ContractInfo -> VM (TVFuncUpdate ContractInfo)
+verifyPreCondition env = do
+  debugToEnv env $ "Verifying precondition " ++ name ++ "..."
+  -- TODO: Implement this
+  return emptyVFuncUpdate
+  where
+    name = snd $ currentFuncName env
+
+---------------------------------------------------------------------------
+-- Try to verify postconditions: If an operation `f` has a postcondition,
+-- a proof for the validity of the postcondition is extracted.
+-- If the proof is not successful, a postcondition check is added to `f`.
+
+verifyPostCondition :: TVFuncEnv ContractInfo -> VM (TVFuncUpdate ContractInfo)
+verifyPostCondition env = do
+  debugToEnv env $ "Verifying postcondition " ++ name ++ "..."
+  -- TODO: Implement this
+  return emptyVFuncUpdate
+  where
+    name = snd $ currentFuncName env
 
 ---------------------------------------------------------------------------
 -- Auxiliaries:
