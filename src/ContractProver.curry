@@ -92,7 +92,8 @@ main = do
       let opts' = if z3exists then opts else opts { optVerify = False }
           vlvl  = case optVerb opts of
                     v | v > 2     -> VAll
-                      | v > 1     -> VInfo
+                      | v > 1     -> VDebug
+                      | v > 0     -> VInfo
                       | otherwise -> VNone
           vopts = defaultVOptions
                     { voModules = progs
