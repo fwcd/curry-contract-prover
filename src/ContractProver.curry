@@ -40,14 +40,13 @@ import System.CurryPath                  ( runModuleActionQuiet )
 import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
-import Verification.Env                  ( VFuncEnv (..), VProgEnv (..), currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs )
+import Verification.Env                  ( TVFuncEnv, TVProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs )
 import Verification.Log                  ( printLog )
 import Verification.Run                  ( runTypeAnnotatedVerification )
-import Verification.Info                 ( VProgInfo (..), emptyVProgInfo )
 import Verification.Options              ( VOptions (..), defaultVOptions )
 import Verification.Monad                ( VM, throwVM )
-import Verification.Types                ( Verification (..), emptyVerification )
-import Verification.Update               ( VFuncUpdate (..), VProgUpdate (..), simpleVFuncUpdate, emptyVProgUpdate )
+import Verification.Types                ( TVerification, Verification (..), emptyVerification )
+import Verification.Update               ( TVFuncUpdate, TVProgUpdate, simpleVFuncUpdate, emptyVProgUpdate )
 
 -- Imports from package modules:
 import ESMT
@@ -123,7 +122,7 @@ emptyContractInfo = ContractInfo
   }
 
 --- The contract prover as a framework verification.
-contractProver :: Verification TAProg TAFuncDecl ContractInfo
+contractProver :: TVerification ContractInfo
 contractProver = emptyVerification
   { prepareProg  = prepareProgContracts
   , initFuncInfo = initFuncContracts
@@ -131,7 +130,7 @@ contractProver = emptyVerification
   }
 
 --- Prepares a program's contracts.
-prepareProgContracts :: VProgEnv TAProg TAFuncDecl ContractInfo -> VM (VProgUpdate TAProg)
+prepareProgContracts :: TVProgEnv ContractInfo -> VM TVProgUpdate
 prepareProgContracts env = do
   prog <- currentProg env
 
@@ -147,7 +146,7 @@ prepareProgContracts env = do
       snd qf ++ " (module " ++ fst qf ++ "): " ++ err
 
 --- Initializes the results for a function by finding all associated pre- and postconditions.
-initFuncContracts :: VFuncEnv TAProg TAFuncDecl ContractInfo -> VM ContractInfo
+initFuncContracts :: TVFuncEnv ContractInfo -> VM ContractInfo
 initFuncContracts env = do
   fdecls <- currentProgFuncs env
 
@@ -160,7 +159,7 @@ initFuncContracts env = do
     }
 
 --- Verifies a single function declaration by proving the contracts.
-verifyFuncContracts :: VFuncEnv TAProg TAFuncDecl ContractInfo -> VM (VFuncUpdate TAFuncDecl ContractInfo)
+verifyFuncContracts :: TVFuncEnv ContractInfo -> VM (TVFuncUpdate ContractInfo)
 verifyFuncContracts env = do
   ci <- currentFuncInfo env
   -- TODO
