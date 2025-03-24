@@ -41,7 +41,7 @@ import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
 import Verification.Env                  ( TVFuncEnv, TVProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, infoToEnv, debugToEnv )
-import Verification.Log                  ( printLog )
+import Verification.Log                  ( VLevel (..), printLog, withVLevel )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.Options              ( VOptions (..), defaultVOptions )
 import Verification.Monad                ( VM, throwVM )
@@ -90,9 +90,13 @@ main = do
         , "The SMT solver Z3 is required for the verifier"
         , "but the program 'z3' is not found in the PATH!"]
       let opts' = if z3exists then opts else opts { optVerify = False }
+          vlvl  = case optVerb opts of
+                    v | v > 2     -> VAll
+                      | v > 1     -> VInfo
+                      | otherwise -> VNone
           vopts = defaultVOptions
                     { voModules = progs
-                    , voLog     = printLog
+                    , voLog     = withVLevel vlvl printLog
                     }
 
       if optLegacy opts
