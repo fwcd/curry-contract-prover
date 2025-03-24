@@ -13,7 +13,7 @@
 
 module ContractProver where
 
-import Control.Monad      ( unless, when, void )
+import Control.Monad      ( unless, when )
 import Data.IORef
 import Data.List          ( elemIndex, find, init, isPrefixOf, last, maximum
                           , minimum, nub, partition, splitOn, union )
@@ -42,8 +42,9 @@ import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
 import Verification.Env                  ( VFuncEnv (..), VProgEnv (..), currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs )
 import Verification.Run                  ( runTypeAnnotatedVerification )
-import Verification.ProgInfo             ( VProgInfo (..), emptyVProgInfo )
+import Verification.Info                 ( VProgInfo (..), emptyVProgInfo )
 import Verification.Options              ( VOptions (..), defaultVOptions )
+import Verification.Monad                ( VM, throwVM )
 import Verification.Types                ( Verification (..), emptyVerification )
 import Verification.Update               ( VFuncUpdate (..), VProgUpdate (..), simpleVFuncUpdate, emptyVProgUpdate )
 
@@ -95,7 +96,11 @@ main = do
 
       if optLegacy opts
         then mapM_ (proveContracts opts') progs
-        else void $ runTypeAnnotatedVerification contractProver vopts
+        else do
+          result <- runTypeAnnotatedVerification contractProver vopts
+          case result of
+            Left e  -> putStrLn ("Verification failed: " ++ e) >> exitWith 1
+            Right _ -> return ()
 
 ---------------------------------------------------------------------------
 
@@ -118,21 +123,21 @@ emptyContractInfo = ContractInfo
 --- The contract prover as a framework verification.
 contractProver :: Verification TAProg TAFuncDecl ContractInfo
 contractProver = emptyVerification
-  { preprocessProg = preprocessProgContracts
-  , initFuncInfo   = initFuncContracts
-  , verifyFunc     = verifyFuncContracts
+  { prepareProg  = prepareProgContracts
+  , initFuncInfo = initFuncContracts
+  , verifyFunc   = verifyFuncContracts
   }
 
---- Preprocesses a program's contracts.
-preprocessProgContracts :: VProgEnv TAProg TAFuncDecl ContractInfo -> IO (VProgUpdate TAProg)
-preprocessProgContracts env = do
-  let prog = currentProg env
-      errs = checkContractUsage (progName prog)
+--- Prepares a program's contracts.
+prepareProgContracts :: VProgEnv TAProg TAFuncDecl ContractInfo -> VM (VProgUpdate TAProg)
+prepareProgContracts env = do
+  prog <- currentProg env
+
+  let errs = checkContractUsage (progName prog)
              (map (\fd -> (snd (funcName fd), funcType fd)) (progFuncs prog))
 
-  unless (null errs) $ do
-    putStr . unlines $ showOpError <$> errs
-    exitWith 1
+  unless (null errs) $
+    throwVM . unlines $ showOpError <$> errs
 
   return emptyVProgUpdate
   where
@@ -140,10 +145,11 @@ preprocessProgContracts env = do
       snd qf ++ " (module " ++ fst qf ++ "): " ++ err
 
 --- Initializes the results for a function by finding all associated pre- and postconditions.
-initFuncContracts :: VFuncEnv TAProg TAFuncDecl ContractInfo -> IO ContractInfo
+initFuncContracts :: VFuncEnv TAProg TAFuncDecl ContractInfo -> VM ContractInfo
 initFuncContracts env = do
-  let fdecls          = currentProgFuncs env
-      name            = snd $ currentFuncName env
+  fdecls <- currentProgFuncs env
+
+  let name            = snd $ currentFuncName env
       funcsMatching f = filter (== f name) $ snd . funcName <$> fdecls
 
   return $ emptyContractInfo
@@ -152,9 +158,9 @@ initFuncContracts env = do
     }
 
 --- Verifies a single function declaration by proving the contracts.
-verifyFuncContracts :: VFuncEnv TAProg TAFuncDecl ContractInfo -> IO (VFuncUpdate ContractInfo)
+verifyFuncContracts :: VFuncEnv TAProg TAFuncDecl ContractInfo -> VM (VFuncUpdate TAFuncDecl ContractInfo)
 verifyFuncContracts env = do
-  let ci = currentFuncInfo env
+  ci <- currentFuncInfo env
   -- TODO
   return $ simpleVFuncUpdate ci
 
