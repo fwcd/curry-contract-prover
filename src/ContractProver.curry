@@ -41,6 +41,7 @@ import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
 import Verification.Env                  ( VFuncEnv (..), VProgEnv (..), currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs )
+import Verification.Log                  ( printLog )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.Info                 ( VProgInfo (..), emptyVProgInfo )
 import Verification.Options              ( VOptions (..), defaultVOptions )
@@ -92,6 +93,7 @@ main = do
       let opts' = if z3exists then opts else opts { optVerify = False }
           vopts = defaultVOptions
                     { voModules = progs
+                    , voLog     = printLog
                     }
 
       if optLegacy opts
