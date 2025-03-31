@@ -24,6 +24,7 @@ emptyContractInfo = ContractInfo
   }
 
 --- Shows the statistics in human-readable format.
+--- TODO: Should we use Doc for this for better alignment?
 showContractInfo :: ContractInfo -> String
 showContractInfo ci =
   showStat "PRECONDITIONS : VERIFIED  " (verified (ciPreConds ci)) ++
