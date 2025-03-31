@@ -50,6 +50,7 @@ import Verification.Types                ( TVerification, Verification (..), emp
 import Verification.Update               ( TVFuncUpdate, TVProgUpdate, simpleVFuncUpdate, emptyVProgUpdate, emptyVFuncUpdate )
 
 -- Imports from package modules:
+import ContractInfo             ( ContractInfo (..), emptyContractInfo )
 import ESMT
 import Curry2SMT
 import FlatCurry.Typed.Build
@@ -110,22 +111,6 @@ main = do
             Right _ -> return ()
 
 ---------------------------------------------------------------------------
-
--- TODO: Clean this up/move these types into modules
-
-data ContractInfo = ContractInfo
-  -- TODO: Is String the right type to represent pre-/postconditions here?
-  { ciPreconds  :: [String] -- The contract's preconditions
-  , ciPostconds :: [String] -- The contract's postconditions
-  , ciHold      :: Bool     -- Whether the postconditions hold
-  }
-
-emptyContractInfo :: ContractInfo
-emptyContractInfo = ContractInfo
-  { ciPreconds  = []
-  , ciPostconds = []
-  , ciHold      = False
-  }
 
 --- The contract prover as a framework verification.
 contractProver :: Options -> TVerification ContractInfo
