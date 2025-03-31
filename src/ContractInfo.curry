@@ -11,26 +11,26 @@ data Cond = Cond
 -- TODO: Should we rename the type (and module, functions, ...) to ContractStats?
 
 data ContractInfo = ContractInfo
-  { ciPreconds  :: [Cond] -- The contract's preconditions
-  , ciPostconds :: [Cond] -- The contract's postconditions
+  { ciPreConds  :: [Cond] -- The contract's preconditions
+  , ciPostConds :: [Cond] -- The contract's postconditions
   , ciHold      :: Bool   -- Whether the postconditions hold
   }
 
 emptyContractInfo :: ContractInfo
 emptyContractInfo = ContractInfo
-  { ciPreconds  = []
-  , ciPostconds = []
+  { ciPreConds  = []
+  , ciPostConds = []
   , ciHold      = False
   }
 
 --- Shows the statistics in human-readable format.
 showContractInfo :: ContractInfo -> String
 showContractInfo ci =
-  showStat "PRECONDITIONS : VERIFIED  " (verified (ciPreconds ci)) ++
-  showStat "PRECONDITIONS : UNVERIFIED" (unverified (ciPreconds ci)) ++
-  showStat "POSTCONDITIONS: VERIFIED  " (verified (ciPostconds ci)) ++
-  showStat "POSTCONDITIONS: UNVERIFIED" (unverified (ciPreconds ci)) ++
-  (if null (unverified (ciPreconds ci) ++ unverified (ciPostconds ci))
+  showStat "PRECONDITIONS : VERIFIED  " (verified (ciPreConds ci)) ++
+  showStat "PRECONDITIONS : UNVERIFIED" (unverified (ciPreConds ci)) ++
+  showStat "POSTCONDITIONS: VERIFIED  " (verified (ciPostConds ci)) ++
+  showStat "POSTCONDITIONS: UNVERIFIED" (unverified (ciPreConds ci)) ++
+  (if null (unverified (ciPreConds ci) ++ unverified (ciPostConds ci))
      then "\nALL CONTRACTS VERIFIED!"
      else "")
  where
@@ -40,8 +40,8 @@ showContractInfo ci =
 
 --- Adds an operation to the already processed preconditions.
 addPreCondToInfo :: Cond -> ContractInfo -> ContractInfo
-addPreCondToInfo c ci = ci { ciPreconds = c : ciPreconds ci }
+addPreCondToInfo c ci = ci { ciPreConds = c : ciPreConds ci }
 
 --- Adds an operation to the already processed postconditions.
 addPostCondToInfo :: Cond -> ContractInfo -> ContractInfo
-addPostCondToInfo c ci = ci { ciPostconds = c : ciPostconds ci }
+addPostCondToInfo c ci = ci { ciPostConds = c : ciPostConds ci }

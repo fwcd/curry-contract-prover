@@ -144,8 +144,8 @@ initFuncContracts env = do
       funcsMatching f = filter (== f name) $ snd . funcName <$> fdecls
 
   return $ emptyContractInfo
-    { ciPreconds  = funcsMatching toPreCondName
-    , ciPostconds = funcsMatching toPostCondName
+    { ciPreConds  = funcsMatching toPreCondName
+    , ciPostConds = funcsMatching toPostCondName
     }
 
 --- Verifies a single function declaration by proving the contracts.
