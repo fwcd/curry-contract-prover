@@ -41,7 +41,7 @@ import System.CurryPath                  ( runModuleActionQuiet )
 import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
-import Verification.Env                  ( TVFuncEnv, TVProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, infoToEnv, debugToEnv )
+import Verification.Env                  ( TVFuncEnv, TVProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, typeDeclFromEnv, infoToEnv, debugToEnv )
 import Verification.Log                  ( VLevel (..), printLog, withVLevel )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.Options              ( VOptions (..), defaultVOptions )
@@ -512,9 +512,9 @@ genSMTTypes vartypes fdecls smtterms = do
       (pretypes,usertypes) = partition ((== "Prelude") . fst) alltcons
       presorts = nub (filter (`notElem` (map tcons2SMT pretypes)) allsorts) ++
                  map tcons2SMT pretypes
-  vst <- readIORef vstref
+  env <- askFuncEnv
   let udecls = map (maybe (error "Internal error: some datatype not found!") id)
-                   (map (tdeclOf vst) usertypes)
+                   (map (typeDeclFromEnv env) usertypes)
   return $ concatMap preludeSort2SMT presorts ++
            [ EmptyLine ] ++
            (if null udecls
@@ -746,6 +746,10 @@ evalTransStateM m e = evalStateT (runReaderT e) emptyTransState
 -- Fetches the options from the environment.
 askOptions :: TransStateM Options
 askOptions = teOptions <$> ask
+
+-- Fetches the function environment from the environment.
+askFuncEnv :: TransStateM (TVFuncEnv ContractInfo)
+askFuncEnv = teFuncEnv <$> ask
 
 -- Gets the current fresh variable index of the state.
 getFreshVarIndex :: TransStateM Int
