@@ -1,6 +1,6 @@
 module ContractInfo
   ( ContractInfo (..)
-  , emptyContractInfo, addPreCondToInfo, addPostCondToInfo
+  , emptyContractInfo, showContractInfo, addPreCondToInfo, addPostCondToInfo
   ) where
 
 data Cond = Cond
@@ -22,6 +22,21 @@ emptyContractInfo = ContractInfo
   , ciPostconds = []
   , ciHold      = False
   }
+
+--- Shows the statistics in human-readable format.
+showContractInfo :: ContractInfo -> String
+showContractInfo ci =
+  showStat "PRECONDITIONS : VERIFIED  " (verified (ciPreconds ci)) ++
+  showStat "PRECONDITIONS : UNVERIFIED" (unverified (ciPreconds ci)) ++
+  showStat "POSTCONDITIONS: VERIFIED  " (verified (ciPostconds ci)) ++
+  showStat "POSTCONDITIONS: UNVERIFIED" (unverified (ciPreconds ci)) ++
+  (if null (unverified (ciPreconds ci) ++ unverified (ciPostconds ci))
+     then "\nALL CONTRACTS VERIFIED!"
+     else "")
+ where
+  verified      = filter cVerified
+  unverified    = filter (not . cVerified)
+  showStat t fs = if null fs then "" else "\n" ++ t ++ ": " ++ unwords (cName <$> fs)
 
 --- Adds an operation to the already processed preconditions.
 addPreCondToInfo :: Cond -> ContractInfo -> ContractInfo
