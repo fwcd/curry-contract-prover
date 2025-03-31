@@ -62,7 +62,6 @@ import FlatCurry.Typed.Types
 import Legacy.ContractProver    ( proveContracts )
 import PackageConfig            ( getPackagePath )
 import ToolOptions
-import VerifierState
 
 ------------------------------------------------------------------------
 

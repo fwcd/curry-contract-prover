@@ -1,4 +1,4 @@
-module VerifierState where
+module Legacy.VerifierState where
 
 import Data.IORef
 import Data.List  ( find )

@@ -22,9 +22,9 @@ import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
 import FlatCurry.Typed.Simplify
 import FlatCurry.Typed.Types
+import Legacy.VerifierState
 import PackageConfig ( packagePath )
 import ToolOptions
-import VerifierState
 
 ----------------------------------------------------------------------------
 --- Reads a typed FlatCurry program together with a possible `_SPEC` program

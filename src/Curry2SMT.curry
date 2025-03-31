@@ -26,7 +26,7 @@ import FlatCurry.Typed.Names
 import FlatCurry.Typed.NonDet2Det
 import FlatCurry.Typed.Types
 import ToolOptions
-import VerifierState
+import Legacy.VerifierState
 
 --- Translates a list of operations specified by their qualified name
 --- (together with all operations on which these operation depend on)
