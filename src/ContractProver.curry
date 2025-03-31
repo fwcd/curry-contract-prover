@@ -24,6 +24,7 @@ import System.Environment ( getArgs, getEnv )
 import Contract.Names
 import Contract.Usage                    ( checkContractUsage )
 import Control.Monad.Trans.Class         ( lift )
+import Control.Monad.Trans.Reader        ( ReaderT, runReaderT, ask )
 import Control.Monad.Trans.State         ( StateT, get, put, evalStateT )
 import System.FilePath                   ( (</>) )
 import FlatCurry.Files
@@ -204,8 +205,8 @@ verifyPostCondition opts env = do
                        "Operation of this postcondition not found!"
             return allfuns)
         --(\checkfun -> provePC checkfun) --TODO: simplify definition
-        (\checkfun -> evalStateT (provePC postfun (simpFuncDecl checkfun))
-                                 emptyTransState)
+        (\checkfun -> evalTransStateM (provePC postfun (simpFuncDecl checkfun))
+                      (TransEnv opts env))
         (find (\fd -> toPostCondName (snd (funcName fd)) ==
                       decodeContractName pcname)
               allfuns)
@@ -251,17 +252,17 @@ addPostConditionTo pfname fdecl = let fn = funcName fdecl in
     else fdecl
 
 
-extractPostConditionProofObligation :: Options -> [Int] -> Int -> TARule
+extractPostConditionProofObligation :: [Int] -> Int -> TARule
                                     -> TransStateM Term
-extractPostConditionProofObligation _ _ _ (AExternal _ s) =
+extractPostConditionProofObligation _ _ (AExternal _ s) =
   return $ tComb ("External: " ++ s) []
-extractPostConditionProofObligation opts args resvar
+extractPostConditionProofObligation args resvar
                                     (ARule ty orgargs orgexp) = do
   let exp    = rnmAllVars renameRuleVar orgexp
       rtype  = resType (length orgargs) (stripForall ty)
   put $ makeTransState (maximum (resvar : allVars exp) + 1)
                        ((resvar, rtype) : zip args (map snd orgargs))
-  binding2SMT True opts (resvar,exp)
+  binding2SMT True (resvar,exp)
  where
   maxArgResult = maximum (resvar : args)
   renameRuleVar r = maybe (r + maxArgResult + 1)
@@ -355,8 +356,8 @@ pred2smt exp = case exp of
 -- Moreover, the returned state contains also the types of all fresh variables.
 -- If the first argument is `False`, the expression is not strictly demanded,
 -- i.e., possible contracts of it (if it is a function call) are ignored.
-binding2SMT :: Bool -> Options -> (Int,TAExpr) -> TransStateM Term
-binding2SMT odemanded opts (oresvar,oexp) =
+binding2SMT :: Bool -> (Int,TAExpr) -> TransStateM Term
+binding2SMT odemanded (oresvar,oexp) =
   exp2smt odemanded (oresvar, simpExpr oexp)
  where
   exp2smt demanded (resvar,exp) = case exp of
@@ -369,6 +370,7 @@ binding2SMT odemanded opts (oresvar,oexp) =
         else do
           (bs,nargs) <- normalizeArgs args
           -- TODO: select from 'bindexps' only demanded argument positions
+          opts <- askOptions
           bindexps <- mapM (exp2smt (isPrimOp qf || optStrict opts)) bs
           comb2smt qf ty ct nargs bs bindexps
     ALet _ bs e -> do
@@ -408,8 +410,8 @@ binding2SMT odemanded opts (oresvar,oexp) =
                                              (map arg2smt nargs))]))
      | otherwise -- non-primitive operation: add contract only if demanded
      = do let targs = zip (map fst bs) (map annExpr nargs)
-          precond  <- preCondExpOf opts qf targs
-          postcond <- postCondExpOf opts qf (targs ++ [(resvar,rtype)])
+          precond  <- preCondExpOf qf targs
+          postcond <- postCondExpOf qf (targs ++ [(resvar,rtype)])
           return
             (tConj (bindexps ++ if demanded then [precond,postcond] else []))
     
@@ -443,11 +445,12 @@ unzipBranches (ABranch p e : brs) = (p:xs,e:ys)
  where (xs,ys) = unzipBranches brs
 
 ---------------------------------------------------------------------------
-checkImplication :: Options -> String -> [(Int,TypeExpr)]
+checkImplication :: String -> [(Int,TypeExpr)]
                  -> Term -> Term -> Term -> TransStateM (Maybe String)
-checkImplication opts scripttitle vartypes assertion impbindings imp =
+checkImplication scripttitle vartypes assertion impbindings imp = do
+  opts <- askOptions
   if optVerify opts
-    then checkImplicationWithSMT opts scripttitle vartypes
+    then checkImplicationWithSMT scripttitle vartypes
                                  assertion impbindings imp
     else return Nothing
 
@@ -455,17 +458,17 @@ checkImplication opts scripttitle vartypes assertion impbindings imp =
 -- (pre/post) condition.
 -- Returns `Nothing` if the proof was not successful, otherwise
 -- the SMT script containing the proof (to obtain `unsat`) is returned.
-checkImplicationWithSMT :: Options -> String -> [(Int,TypeExpr)]
+checkImplicationWithSMT :: String -> [(Int,TypeExpr)]
                         -> Term -> Term -> Term -> TransStateM (Maybe String)
-checkImplicationWithSMT opts scripttitle vartypes
+checkImplicationWithSMT scripttitle vartypes
                         assertion impbindings imp = do
   let allsyms = catMaybes
                   (map (\n -> maybe Nothing Just (untransOpName n))
                        (map qidName
                          (allQIdsOfTerm (tConj [assertion, impbindings, imp]))))
-  unless (null allsyms) $ printWhenIntermediate opts $
+  unless (null allsyms) $ printWhenIntermediate $
     "Translating operations into SMT: " ++ unwords (map showQName allsyms)
-  (smtfuncs,fdecls,ndinfo) <- funcs2SMT opts allsyms
+  (smtfuncs,fdecls,ndinfo) <- funcs2SMT allsyms
   smttypes <- genSMTTypes vartypes fdecls [assertion,impbindings,imp]
   let freshvar = maximum (map fst vartypes) + 1
       ([assertionC,impbindingsC,impC],newix) =
@@ -491,7 +494,7 @@ checkImplicationWithSMT opts scripttitle vartypes
                    then readInclude "Prelude_Choice.smt"
                    else return ""
   let smtprelude = smtstdtypes ++ smtchoice
-  callSMT opts $ "; " ++ scripttitle ++ "\n\n" ++ smtprelude ++ showSMT smt
+  callSMT $ "; " ++ scripttitle ++ "\n\n" ++ smtprelude ++ showSMT smt
  where
   readInclude f = getIncludePath f >>= readFile
   toChoiceVar i = (i, TCons (pre "Choice") [])
@@ -521,8 +524,9 @@ genSMTTypes vartypes fdecls smtterms = do
 
 -- Calls the SMT solver (with a timeout of 2secs) on a given SMTLIB script.
 -- Returns `Just` the SMT script if the result is `unsat`, otherwise `Nothing`.
-callSMT :: Options -> String -> IO (Maybe String)
-callSMT opts smtinput = do
+callSMT :: String -> IO (Maybe String)
+callSMT smtinput = do
+  opts <- askOptions
   printWhenIntermediate opts $ "SMT SCRIPT:\n" ++ showWithLineNums smtinput
   printWhenIntermediate opts $ "CALLING Z3..."
   (ecode,out,err) <- evalCmd "z3"
@@ -686,8 +690,8 @@ showDictTypeOf te =
 --
 --     f xs = checkPreCond (f'NOCHECK xs) (f'pre xs) "f" xs
 --     f'NOCHECK xs = rhs
-addPreConditions :: Options -> TAProg -> IORef VState -> IO TAProg
-addPreConditions _ prog vstref = do
+addPreConditions :: TAProg -> IORef VState -> IO TAProg
+addPreConditions prog vstref = do
   newfuns  <- mapM addPreCondition (progFuncs prog)
   return (updProgFuncs (const (concat newfuns)) prog)
  where
@@ -709,6 +713,12 @@ addPreConditions _ prog vstref = do
     snd qn ++ "'!"
 
 ---------------------------------------------------------------------------
+-- The environment of the transformation process.
+data TransEnv = TransEnv
+  { teOptions :: Options
+  , teFuncEnv :: TVFuncEnv ContractInfo
+  }
+
 -- The state of the transformation process contains
 -- * the current assertion
 -- * a fresh variable index
@@ -727,7 +737,15 @@ emptyTransState = makeTransState 0 []
 
 -- The type of the state monad contains the transformation state.
 --type TransStateM a = State TransState a
-type TransStateM = StateT TransState VM
+type TransStateM = StateT TransState (ReaderT TransEnv VM)
+
+-- Evaluates the trans state monad.
+evalTransStateM :: TransStateM a -> TransEnv -> IO a
+evalTransStateM m e = evalStateT (runReaderT e) emptyTransState
+
+-- Fetches the options from the environment.
+askOptions :: TransStateM Options
+askOptions = teOptions <$> ask
 
 -- Gets the current fresh variable index of the state.
 getFreshVarIndex :: TransStateM Int
