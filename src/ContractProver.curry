@@ -46,11 +46,12 @@ import Verification.Log                  ( VLevel (..), printLog, withVLevel )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.Options              ( VOptions (..), defaultVOptions )
 import Verification.Monad                ( VM, throwVM )
+import Verification.State                ( prettyVState )
 import Verification.Types                ( TVerification, Verification (..), emptyVerification )
 import Verification.Update               ( TVFuncUpdate, TVProgUpdate, simpleVFuncUpdate, emptyVProgUpdate, emptyVFuncUpdate )
 
 -- Imports from package modules:
-import ContractInfo             ( ContractInfo (..), emptyContractInfo )
+import ContractInfo             ( ContractInfo (..), emptyContractInfo, showContractInfo )
 import ESMT
 import Curry2SMT
 import FlatCurry.Typed.Build
@@ -107,7 +108,7 @@ main = do
           result <- runTypeAnnotatedVerification (contractProver opts) vopts
           case result of
             Left e  -> putStrLn ("Verification failed: " ++ e) >> exitWith 1
-            Right _ -> return ()
+            Right s -> putStrLn $ prettyVState showContractInfo
 
 ---------------------------------------------------------------------------
 
