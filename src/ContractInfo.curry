@@ -8,6 +8,8 @@ data Cond = Cond
   , cVerified :: Bool   -- Whether the condition could be verified
   }
 
+-- TODO: Should we rename the type (and module, functions, ...) to ContractStats?
+
 data ContractInfo = ContractInfo
   { ciPreconds  :: [Cond] -- The contract's preconditions
   , ciPostconds :: [Cond] -- The contract's postconditions
