@@ -211,20 +211,20 @@ verifyPostCondition opts env = do
       precondformula  <- preCondExpOf opts orgqn (init targsr)
       postcondformula <- applyFunc postfun targsr >>= pred2smt
       let title = "verify postcondition of '" ++ mainfunc ++ "'..."
-      lift $ printWhenIntermediate opts $ "Trying to " ++ title
+      debugM $ "Trying to " ++ title
       vartypes <- getVarTypes
       pcproof <- checkImplication opts ("SMT script to " ++ title) vartypes
                          (tConj [precondformula, bodyformula])
                          tTrue postcondformula
       lift $ modifyIORef vstref (addPostCondToStats mainfunc (isJust pcproof))
       maybe
-        (do lift $ (printWhenStatus opts $ mainfunc ++ ": POSTCOND CHECK ADDED")
+        (do infoM $ mainfunc ++ ": POSTCOND CHECK ADDED"
             return (map (addPostConditionTo (funcName postfun)) allfuns) )
         (\proof -> do
            unless (optNoProof opts) $ lift $
              writeFile ("PROOF_" ++ showQNameNoDots orgqn ++ "_" ++
                         "SatisfiesPostCondition.smt") proof
-           lift $ printWhenStatus opts $ mainfunc ++ ": POSTCONDITION VERIFIED"
+           infoM $ mainfunc ++ ": POSTCONDITION VERIFIED"
            return allfuns )
         pcproof
 
@@ -451,7 +451,7 @@ checkImplicationWithSMT scripttitle vartypes
                   (map (\n -> maybe Nothing Just (untransOpName n))
                        (map qidName
                          (allQIdsOfTerm (tConj [assertion, impbindings, imp]))))
-  unless (null allsyms) $ printWhenIntermediate $
+  unless (null allsyms) $ debugM $
     "Translating operations into SMT: " ++ unwords (map showQName allsyms)
   (smtfuncs,fdecls,ndinfo) <- funcs2SMT allsyms
   smttypes <- genSMTTypes vartypes fdecls [assertion,impbindings,imp]
@@ -509,18 +509,18 @@ genSMTTypes vartypes fdecls smtterms = do
 
 -- Calls the SMT solver (with a timeout of 2secs) on a given SMTLIB script.
 -- Returns `Just` the SMT script if the result is `unsat`, otherwise `Nothing`.
-callSMT :: String -> IO (Maybe String)
+callSMT :: String -> TransStateM (Maybe String)
 callSMT smtinput = do
   opts <- askOptions
-  printWhenIntermediate opts $ "SMT SCRIPT:\n" ++ showWithLineNums smtinput
-  printWhenIntermediate opts $ "CALLING Z3..."
+  debugM $ "SMT SCRIPT:\n" ++ showWithLineNums smtinput
+  debugM $ "CALLING Z3..."
   (ecode,out,err) <- evalCmd "z3"
                              ["-smt2", "-in", "-T:" ++ show (optTimeout opts)]
                              smtinput
-  when (ecode>0) $ do printWhenIntermediate opts $ "EXIT CODE: " ++ show ecode
+  when (ecode>0) $ do debugM $ "EXIT CODE: " ++ show ecode
                       writeFile "error.smt" smtinput
-  printWhenIntermediate opts $ "RESULT:\n" ++ out
-  unless (null err) $ printWhenIntermediate opts $ "ERROR:\n" ++ err
+  debugM $ "RESULT:\n" ++ out
+  unless (null err) $ debugM $ "ERROR:\n" ++ err
   let unsat = let ls = lines out in not (null ls) && head ls == "unsat"
   return $ if unsat
              then Just $ "; proved by: z3 -smt2 <SMTFILE>\n\n" ++ smtinput
@@ -727,6 +727,18 @@ type TransStateM = StateT TransState (ReaderT TransEnv VM)
 -- Evaluates the trans state monad.
 evalTransStateM :: TransStateM a -> TransEnv -> IO a
 evalTransStateM m e = evalStateT (runReaderT e) emptyTransState
+
+-- Logs a message at the debug level.
+debugM :: String -> TransStateM ()
+debugM msg = do
+  env <- askFuncEnv
+  debugToEnv env msg
+
+-- Logs a message at the info level.
+infoM :: String -> TransStateM ()
+infoM msg = do
+  env <- askFuncEnv
+  infoToEnv env msg
 
 -- Fetches the options from the environment.
 askOptions :: TransStateM Options
