@@ -41,7 +41,7 @@ import System.CurryPath                  ( runModuleActionQuiet )
 import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
-import Verification.Env                  ( TVFuncEnv, TVProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, typeDeclFromEnv, infoToEnv, debugToEnv )
+import Verification.Env                  ( TVFuncEnv, TVProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, funcInfoFromEnv, typeDeclFromEnv, infoToEnv, debugToEnv )
 import Verification.Log                  ( VLevel (..), printLog, withVLevel )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.Options              ( VOptions (..), defaultVOptions )
@@ -265,24 +265,22 @@ extractPostConditionProofObligation args resvar
 -- and its arguments (which are assumed to be variable indices).
 -- Rename all local variables by adding the `freshvar` index to them.
 preCondExpOf :: VerifyInfo -> QName -> [(Int,TypeExpr)] -> TransStateM Term
-preCondExpOf ti qf args =
+preCondExpOf ti qf args = do
+  env <- askFuncEnv
   maybe (return tTrue)
         (\fd -> applyFunc fd args >>= pred2smt)
-        (find (\fd -> decodeContractQName (funcName fd)
-                        == toPreCondQName (fromNoCheckQName qf))
-              (preConds ti))
+        (funcInfoFromEnv env (encodeContractQName (toPreCondQName (fromNoCheckQName qf))))
 
 -- Returns the postcondition expression for a given operation
 -- and its arguments (which are assumed to be variable indices).
 -- Rename all local variables by adding `freshvar` to them and
 -- return the new freshvar value.
 postCondExpOf :: VerifyInfo -> QName -> [(Int,TypeExpr)] -> TransStateM Term
-postCondExpOf ti qf args =
+postCondExpOf ti qf args = do
+  env <- askFuncEnv
   maybe (return tTrue)
         (\fd -> applyFunc fd args >>= pred2smt)
-        (find (\fd -> decodeContractQName (funcName fd)
-                        == toPostCondQName (fromNoCheckQName qf))
-              (postConds ti))
+        (funcInfoFromEnv env (encodeContractQName (toPostCondQName (fromNoCheckQName qf))))
 
 -- Applies a function declaration on a list of arguments,
 -- which are assumed to be variable indices, and returns
