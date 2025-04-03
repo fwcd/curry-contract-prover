@@ -41,14 +41,14 @@ import System.CurryPath                  ( runModuleActionQuiet )
 import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
-import Verification.Env                  ( TVFuncEnv, TVProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, funcInfoFromEnv, typeDeclFromEnv, infoToEnv, debugToEnv )
+import Verification.Env                  ( TFuncEnv, TProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, funcInfoFromEnv, typeDeclFromEnv, infoToEnv, debugToEnv )
 import Verification.Log                  ( VLevel (..), printLog, withVLevel )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.Options              ( VOptions (..), defaultVOptions )
 import Verification.Monad                ( VM, throwVM )
 import Verification.State                ( prettyVState )
 import Verification.Types                ( TVerification, Verification (..), emptyVerification )
-import Verification.Update               ( TVFuncUpdate, TVProgUpdate, simpleVFuncUpdate, emptyVProgUpdate, emptyVFuncUpdate )
+import Verification.Update               ( TFuncUpdate, TProgUpdate, simpleVFuncUpdate, emptyVProgUpdate, emptyVFuncUpdate )
 
 -- Imports from package modules:
 import ContractInfo             ( ContractInfo (..), emptyContractInfo, showContractInfo )
@@ -121,7 +121,7 @@ contractProver opts = emptyVerification
   }
 
 --- Prepares a program's contracts.
-prepareProgContracts :: TVProgEnv ContractInfo -> VM TVProgUpdate
+prepareProgContracts :: TProgEnv ContractInfo -> VM TProgUpdate
 prepareProgContracts env = do
   prog <- currentProg env
 
@@ -137,7 +137,7 @@ prepareProgContracts env = do
       snd qf ++ " (module " ++ fst qf ++ "): " ++ err
 
 --- Initializes the results for a function by finding all associated pre- and postconditions.
-initFuncContracts :: TVFuncEnv ContractInfo -> VM ContractInfo
+initFuncContracts :: TFuncEnv ContractInfo -> VM ContractInfo
 initFuncContracts env = do
   fdecls <- currentProgFuncs env
 
@@ -150,7 +150,7 @@ initFuncContracts env = do
     }
 
 --- Verifies a single function declaration by proving the contracts.
-verifyFuncContracts :: Options -> TVFuncEnv ContractInfo -> VM (TVFuncUpdate ContractInfo)
+verifyFuncContracts :: Options -> TFuncEnv ContractInfo -> VM (TFuncUpdate ContractInfo)
 verifyFuncContracts opts env = do
   case snd $ currentFuncName env of
     name | isPreCondName  name -> verifyPreCondition  opts env
@@ -163,7 +163,7 @@ verifyFuncContracts opts env = do
 -- this precondition is extracted.
 -- If the proof is not successful, a precondition check is added to this call.
 
-verifyPreCondition :: Options -> TVFuncEnv ContractInfo -> VM (TVFuncUpdate ContractInfo)
+verifyPreCondition :: Options -> TFuncEnv ContractInfo -> VM (TFuncUpdate ContractInfo)
 verifyPreCondition opts env = do
   debugToEnv env $ "Verifying precondition " ++ name ++ "..."
   -- TODO: Implement this
@@ -176,7 +176,7 @@ verifyPreCondition opts env = do
 -- a proof for the validity of the postcondition is extracted.
 -- If the proof is not successful, a postcondition check is added to `f`.
 
-verifyPostCondition :: Options -> TVFuncEnv ContractInfo -> VM (TVFuncUpdate ContractInfo)
+verifyPostCondition :: Options -> TFuncEnv ContractInfo -> VM (TFuncUpdate ContractInfo)
 verifyPostCondition opts env = do
   debugToEnv env $ "Verifying postcondition " ++ pcname ++ "..."
   
@@ -216,7 +216,6 @@ verifyPostCondition opts env = do
       pcproof <- checkImplication opts ("SMT script to " ++ title) vartypes
                          (tConj [precondformula, bodyformula])
                          tTrue postcondformula
-      lift $ modifyIORef vstref (addPostCondToStats mainfunc (isJust pcproof))
       maybe
         (do infoM $ mainfunc ++ ": POSTCOND CHECK ADDED"
             return (map (addPostConditionTo (funcName postfun)) allfuns) )
@@ -225,7 +224,7 @@ verifyPostCondition opts env = do
              writeFile ("PROOF_" ++ showQNameNoDots orgqn ++ "_" ++
                         "SatisfiesPostCondition.smt") proof
            infoM $ mainfunc ++ ": POSTCONDITION VERIFIED"
-           return allfuns )
+           return $ simpleVFuncUpdate $  )
         pcproof
 
 -- If the function declaration is the declaration of the given function name,
@@ -699,7 +698,7 @@ showDictTypeOf te =
 -- The environment of the transformation process.
 data TransEnv = TransEnv
   { teOptions :: Options
-  , teFuncEnv :: TVFuncEnv ContractInfo
+  , teFuncEnv :: TFuncEnv ContractInfo
   }
 
 -- The state of the transformation process contains
@@ -743,7 +742,7 @@ askOptions :: TransStateM Options
 askOptions = teOptions <$> ask
 
 -- Fetches the function environment from the environment.
-askFuncEnv :: TransStateM (TVFuncEnv ContractInfo)
+askFuncEnv :: TransStateM (TFuncEnv ContractInfo)
 askFuncEnv = teFuncEnv <$> ask
 
 -- Gets the current fresh variable index of the state.
