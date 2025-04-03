@@ -666,34 +666,34 @@ showDictTypeOf :: TypeExpr -> TypeExpr
 showDictTypeOf te =
   FlatCurry.Typed.Build.unitType ~> TCons ("Prelude","_Dict#Show") [te]
 
-------------------------------------------------------------------------------
--- Add (non-trivial) preconditions:
--- If an operation `f` has some precondition `f'pre`,
--- replace the rule `f xs = rhs` by the following rules:
---
---     f xs = checkPreCond (f'NOCHECK xs) (f'pre xs) "f" xs
---     f'NOCHECK xs = rhs
-addPreConditions :: TAProg -> IORef VState -> IO TAProg
-addPreConditions prog vstref = do
-  newfuns  <- mapM addPreCondition (progFuncs prog)
-  return (updProgFuncs (const (concat newfuns)) prog)
- where
-  addPreCondition fdecl@(AFunc qf ar vis fty rule) = do
-    ti <- readVerifyInfoRef vstref
-    return $
-      if toPreCondQName qf `elem` map funcName (preConds ti)
-        then let newrule = checkPreCondRule qf rule
-             in [updFuncRule (const newrule) fdecl,
-                 AFunc (toNoCheckQName qf) ar vis fty rule]
-        else [fdecl]
+-- ------------------------------------------------------------------------------
+-- -- Add (non-trivial) preconditions:
+-- -- If an operation `f` has some precondition `f'pre`,
+-- -- replace the rule `f xs = rhs` by the following rules:
+-- --
+-- --     f xs = checkPreCond (f'NOCHECK xs) (f'pre xs) "f" xs
+-- --     f'NOCHECK xs = rhs
+-- addPreConditions :: TAProg -> IORef VState -> IO TAProg
+-- addPreConditions prog vstref = do
+--   newfuns  <- mapM addPreCondition (progFuncs prog)
+--   return (updProgFuncs (const (concat newfuns)) prog)
+--  where
+--   addPreCondition fdecl@(AFunc qf ar vis fty rule) = do
+--     ti <- readVerifyInfoRef vstref
+--     return $
+--       if toPreCondQName qf `elem` map funcName (preConds ti)
+--         then let newrule = checkPreCondRule qf rule
+--              in [updFuncRule (const newrule) fdecl,
+--                  AFunc (toNoCheckQName qf) ar vis fty rule]
+--         else [fdecl]
 
-  checkPreCondRule :: QName -> TARule -> TARule
-  checkPreCondRule qn (ARule rty rargs _) =
-    ARule rty rargs (addPreConditionCheck rty FuncCall qn rty
-                       (map (\ (v,t) -> AVar t v) rargs))
-  checkPreCondRule qn (AExternal _ _) = error $
-    "addPreConditions: cannot add precondition to external operation '" ++
-    snd qn ++ "'!"
+--   checkPreCondRule :: QName -> TARule -> TARule
+--   checkPreCondRule qn (ARule rty rargs _) =
+--     ARule rty rargs (addPreConditionCheck rty FuncCall qn rty
+--                        (map (\ (v,t) -> AVar t v) rargs))
+--   checkPreCondRule qn (AExternal _ _) = error $
+--     "addPreConditions: cannot add precondition to external operation '" ++
+--     snd qn ++ "'!"
 
 ---------------------------------------------------------------------------
 -- The environment of the transformation process.
