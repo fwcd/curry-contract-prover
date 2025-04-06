@@ -152,6 +152,16 @@ initFuncContracts env = do
 --- Verifies a single function declaration by proving the contracts.
 verifyFuncContracts :: Options -> TFuncEnv ContractInfo -> VM (TFuncUpdate ContractInfo)
 verifyFuncContracts opts env = do
+  checkfun <- currentFunc
+  allfuns  <- currentProgFuncs env
+
+  let name      = funcName checkfun
+      conds f   = filter (\fd -> snd (funcName fd) == encodeContractName (f name)) allfuns
+      preConds  = conds toPreCondName
+      postConds = conds toPostCondName
+  
+  -- TODO: How do we sequence changes to the function properly?
+
   case snd $ currentFuncName env of
     name | isPreCondName  name -> verifyPreCondition  opts env
          | isPostCondName name -> verifyPostCondition opts env
