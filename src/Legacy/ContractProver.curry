@@ -43,13 +43,13 @@ import System.Process                    ( exitWith, system )
 
 -- Imports from package modules:
 import ESMT
-import Curry2SMT
 import FlatCurry.Typed.Build
-import FlatCurry.Typed.Read
+import FlatCurry.Typed.Read ( readTypedFlatCurryWithSpec, stripForall )
 import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
 import FlatCurry.Typed.Simplify ( simpProg, simpFuncDecl, simpExpr )
 import FlatCurry.Typed.Types
+import Legacy.Curry2SMT
 import Legacy.VerifierState
 import PackageConfig            ( getPackagePath )
 import ToolOptions

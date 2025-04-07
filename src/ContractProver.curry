@@ -14,6 +14,7 @@
 module ContractProver where
 
 import Control.Monad      ( unless, when )
+import Control.Monad.IO.Class ( liftIO )
 import Data.IORef
 import Data.List          ( elemIndex, find, init, isPrefixOf, last, maximum
                           , minimum, nub, partition, splitOn, union )
@@ -191,44 +192,44 @@ verifyPreCondition opts env prefun = do
 -- a proof for the validity of the postcondition is extracted.
 -- If the proof is not successful, a postcondition check is added to `f`.
 
-verifyPostCondition :: Options -> TFuncEnv ContractInfo -> VM Cond
-verifyPostCondition opts env postfun = do
-  debugToEnv env $ "Verifying postcondition " ++ pcname ++ "..."
+verifyPostCondition :: Options -> TFuncEnv ContractInfo -> TAFuncDecl -> VM Cond
+verifyPostCondition opts env postfun = failed
+  -- debugToEnv env $ "Verifying postcondition " ++ pcname ++ "..."
   
-  checkfun <- currentFunc
-  allfuns <- currentProgFuncs env
+  -- checkfun <- currentFunc
+  -- allfuns <- currentProgFuncs env
 
-  evalTransStateM $ do
-    let (postmn,postfn) = funcName postfun
-        mainfunc        = snd (funcName checkfun)
-        orgqn           = (postmn, reverse (drop 5 (reverse postfn)))
-    -- lift $ putStrLn $ "Check postcondition of operation " ++ mainfunc
-    let farity = funcArity checkfun
-        ftype  = funcType checkfun
-        targsr = zip [1..] (argTypes ftype ++ [resultType ftype])
-    bodyformula     <- extractPostConditionProofObligation opts
-                         [1 .. farity] (farity+1) (funcRule checkfun)
-    precondformula  <- preCondExpOf opts orgqn (init targsr)
-    postcondformula <- applyFunc postfun targsr >>= pred2smt
-    let title = "verify postcondition of '" ++ mainfunc ++ "'..."
-    debugM $ "Trying to " ++ title
-    vartypes <- getVarTypes
-    pcproof <- checkImplication opts ("SMT script to " ++ title) vartypes
-                       (tConj [precondformula, bodyformula])
-                       tTrue postcondformula
-    Cond pcname <$> maybe
-      (do infoM $ mainfunc ++ ": POSTCOND CHECK ADDED"
-          return False )
-      (\proof -> do
-         unless (optNoProof opts) $ lift $
-           writeFile ("PROOF_" ++ showQNameNoDots orgqn ++ "_" ++
-                      "SatisfiesPostCondition.smt") proof
-         infoM $ mainfunc ++ ": POSTCONDITION VERIFIED"
-         return True )
-      pcproof
+  -- evalTransStateM $ do
+  --   let (postmn,postfn) = funcName postfun
+  --       mainfunc        = snd (funcName checkfun)
+  --       orgqn           = (postmn, reverse (drop 5 (reverse postfn)))
+  --   -- lift $ putStrLn $ "Check postcondition of operation " ++ mainfunc
+  --   let farity = funcArity checkfun
+  --       ftype  = funcType checkfun
+  --       targsr = zip [1..] (argTypes ftype ++ [resultType ftype])
+  --   bodyformula     <- extractPostConditionProofObligation opts
+  --                        [1 .. farity] (farity+1) (funcRule checkfun)
+  --   precondformula  <- preCondExpOf opts orgqn (init targsr)
+  --   postcondformula <- applyFunc postfun targsr >>= pred2smt
+  --   let title = "verify postcondition of '" ++ mainfunc ++ "'..."
+  --   debugM $ "Trying to " ++ title
+  --   vartypes <- getVarTypes
+  --   pcproof <- checkImplication opts ("SMT script to " ++ title) vartypes
+  --                      (tConj [precondformula, bodyformula])
+  --                      tTrue postcondformula
+  --   Cond pcname <$> maybe
+  --     (do infoM $ mainfunc ++ ": POSTCOND CHECK ADDED"
+  --         return False )
+  --     (\proof -> do
+  --        unless (optNoProof opts) $ lift $
+  --          writeFile ("PROOF_" ++ showQNameNoDots orgqn ++ "_" ++
+  --                     "SatisfiesPostCondition.smt") proof
+  --        infoM $ mainfunc ++ ": POSTCONDITION VERIFIED"
+  --        return True )
+  --     pcproof
 
-  where
-    pcname = snd (funcName postfun)
+  -- where
+  --   pcname = snd (funcName postfun)
 
 
 -- If the function declaration is the declaration of the given function name,
@@ -454,7 +455,7 @@ checkImplicationWithSMT scripttitle vartypes
                          (allQIdsOfTerm (tConj [assertion, impbindings, imp]))))
   unless (null allsyms) $ debugM $
     "Translating operations into SMT: " ++ unwords (map showQName allsyms)
-  (smtfuncs,fdecls,ndinfo) <- funcs2SMT allsyms
+  (smtfuncs,fdecls,ndinfo) <- liftIO $ funcs2SMT allsyms
   smttypes <- genSMTTypes vartypes fdecls [assertion,impbindings,imp]
   let freshvar = maximum (map fst vartypes) + 1
       ([assertionC,impbindingsC,impC],newix) =
@@ -482,7 +483,7 @@ checkImplicationWithSMT scripttitle vartypes
   let smtprelude = smtstdtypes ++ smtchoice
   callSMT $ "; " ++ scripttitle ++ "\n\n" ++ smtprelude ++ showSMT smt
  where
-  readInclude f = getIncludePath f >>= readFile
+  readInclude f = liftIO $ getIncludePath f >>= readFile
   toChoiceVar i = (i, TCons (pre "Choice") [])
 
 -- Computes SMT type declarations for all types occurring in the
@@ -515,11 +516,11 @@ callSMT smtinput = do
   opts <- askOptions
   debugM $ "SMT SCRIPT:\n" ++ showWithLineNums smtinput
   debugM $ "CALLING Z3..."
-  (ecode,out,err) <- evalCmd "z3"
+  (ecode,out,err) <- liftIO $ evalCmd "z3"
                              ["-smt2", "-in", "-T:" ++ show (optTimeout opts)]
                              smtinput
   when (ecode>0) $ do debugM $ "EXIT CODE: " ++ show ecode
-                      writeFile "error.smt" smtinput
+                      liftIO $ writeFile "error.smt" smtinput
   debugM $ "RESULT:\n" ++ out
   unless (null err) $ debugM $ "ERROR:\n" ++ err
   let unsat = let ls = lines out in not (null ls) && head ls == "unsat"
@@ -727,7 +728,7 @@ type TransStateM = StateT TransState (ReaderT TransEnv VM)
 
 -- Evaluates the trans state monad.
 evalTransStateM :: TransStateM a -> TransEnv -> IO a
-evalTransStateM m e = evalStateT (runReaderT e) emptyTransState
+evalTransStateM m e = evalStateT (runReaderT m e) emptyTransState
 
 -- Logs a message at the debug level.
 debugM :: String -> TransStateM ()

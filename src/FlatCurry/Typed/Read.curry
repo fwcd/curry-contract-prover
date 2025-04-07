@@ -17,12 +17,12 @@ import FlatCurry.Annotated.Goodies
 import System.CurryPath              ( getLoadPathForModule, lookupModuleSource
                                      , runModuleActionQuiet, stripCurrySuffix )
 import System.FilePath               ( (</>) )
+import Verification.Env              ( TBaseEnv )
 
 import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
 import FlatCurry.Typed.Simplify
 import FlatCurry.Typed.Types
-import Legacy.VerifierState
 import PackageConfig ( packagePath )
 import ToolOptions
 
@@ -74,9 +74,9 @@ stripForall texp = case texp of
 ----------------------------------------------------------------------------
 --- Extract all user-defined typed FlatCurry functions that might be called
 --- by a given list of functions.
-getAllFunctions :: IORef VState -> [QName] -> IO [TAFuncDecl]
-getAllFunctions vstref newfuns = do
-  currmods <- readIORef vstref >>= return . currTAProgs
+getAllFunctions :: TBaseEnv _ -> [QName] -> IO [TAFuncDecl]
+getAllFunctions env newfuns = do
+  currmods <- readIORef vstref >>= return . currTAProgs -- FIXME
   getAllFuncs currmods [] newfuns
  where
   getAllFuncs _ currfuncs [] = return (reverse currfuncs)

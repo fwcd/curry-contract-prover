@@ -5,7 +5,7 @@
 --- @version May 2021
 ---------------------------------------------------------------------------
 
-module Curry2SMT where
+module Legacy.Curry2SMT where
 
 import Control.Monad ( unless )
 import Data.IORef
@@ -17,16 +17,15 @@ import Numeric       ( readHex )
 import FlatCurry.Annotated.Goodies ( argTypes, resultType, unAnnFuncDecl )
 import FlatCurry.Types             ( showQName )
 import FlatCurry.ShowIntMod        ( showCurryFuncDecl )
-import Verification.Env            ( TBaseEnv )
 
 -- Imports from package modules:
 import ESMT
-import FlatCurry.Typed.Read    ( getAllFunctions )
 import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
 import FlatCurry.Typed.NonDet2Det
 import FlatCurry.Typed.Types
 import ToolOptions
+import Legacy.FlatCurry.Typed.Read    ( getAllFunctions )
 import Legacy.VerifierState
 
 --- Translates a list of operations specified by their qualified name
@@ -37,10 +36,10 @@ import Legacy.VerifierState
 --- In order to call them correctly, a list of qualified operation names
 --- together with their non-determinism status (`True` means non-deterministic)
 --- is also returned.
-funcs2SMT :: Options -> TBaseEnv _ -> [QName]
+funcs2SMT :: Options -> IORef VState -> [QName]
           -> IO (Command, [TAFuncDecl], [(QName,Bool)])
-funcs2SMT opts env qns = do
-  funs <- getAllFunctions env (nub qns)
+funcs2SMT opts vstref qns = do
+  funs <- getAllFunctions vstref (nub qns)
   unless (null funs) $ printWhenAll opts $ unlines $
     "Operations to be axiomatized in SMT:" :
     map (showCurryFuncDecl snd snd . unAnnFuncDecl) funs
