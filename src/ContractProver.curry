@@ -51,7 +51,7 @@ import Verification.Types                ( TVerification, Verification (..), emp
 import Verification.Update               ( TFuncUpdate, TProgUpdate, simpleVFuncUpdate, emptyVProgUpdate, emptyVFuncUpdate )
 
 -- Imports from package modules:
-import ContractInfo             ( ContractInfo (..), emptyContractInfo, showContractInfo )
+import ContractInfo             ( Cond (..), ContractInfo (..), emptyContractInfo, showContractInfo )
 import ESMT
 import Curry2SMT
 import FlatCurry.Typed.Build
@@ -180,9 +180,11 @@ verifyFuncContracts opts env = do
 
 verifyPreCondition :: Options -> TFuncEnv ContractInfo -> TAFuncDecl -> VM Cond
 verifyPreCondition opts env prefun = do
-  debugToEnv env $ "Verifying precondition " ++ name ++ "..."
+  debugToEnv env $ "Verifying precondition " ++ pcname ++ "..."
   -- TODO: Implement this
   return $ Cond "" False
+  where
+    pcname = snd (funcName prefun)
 
 ---------------------------------------------------------------------------
 -- Try to verify postconditions: If an operation `f` has a postcondition,
@@ -193,7 +195,6 @@ verifyPostCondition :: Options -> TFuncEnv ContractInfo -> VM Cond
 verifyPostCondition opts env postfun = do
   debugToEnv env $ "Verifying postcondition " ++ pcname ++ "..."
   
-  let pcname = snd (funcName postfun)
   checkfun <- currentFunc
   allfuns <- currentProgFuncs env
 
@@ -225,6 +226,9 @@ verifyPostCondition opts env postfun = do
          infoM $ mainfunc ++ ": POSTCONDITION VERIFIED"
          return True )
       pcproof
+
+  where
+    pcname = snd (funcName postfun)
 
 
 -- If the function declaration is the declaration of the given function name,

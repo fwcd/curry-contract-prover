@@ -1,5 +1,5 @@
 module ContractInfo
-  ( ContractInfo (..)
+  ( Cond (..), ContractInfo (..)
   , emptyContractInfo, showContractInfo, addPreCondToInfo, addPostCondToInfo
   ) where
 
