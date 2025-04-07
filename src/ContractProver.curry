@@ -42,14 +42,14 @@ import System.CurryPath                  ( runModuleActionQuiet )
 import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
-import Verification.Env                  ( TFuncEnv, TProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, funcDeclFromEnv, typeDeclFromEnv, infoToEnv, debugToEnv )
+import Verification.Env                  ( VTFuncEnv, VTProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, funcDeclFromEnv, typeDeclFromEnv, infoToEnv, debugToEnv )
 import Verification.Log                  ( VLevel (..), printLog, withVLevel )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.Options              ( VOptions (..), defaultVOptions )
 import Verification.Monad                ( VM, throwVM )
 import Verification.State                ( prettyVState )
 import Verification.Types                ( TVerification, Verification (..), emptyVerification )
-import Verification.Update               ( TFuncUpdate, TProgUpdate, simpleVFuncUpdate, emptyVProgUpdate, emptyVFuncUpdate )
+import Verification.Update               ( VTFuncUpdate, VTProgUpdate, simpleVFuncUpdate, emptyVProgUpdate, emptyVFuncUpdate )
 
 -- Imports from package modules:
 import ContractInfo             ( Cond (..), ContractInfo (..), emptyContractInfo, showContractInfo )
@@ -122,7 +122,7 @@ contractProver opts = emptyVerification
   }
 
 --- Prepares a program's contracts.
-prepareProgContracts :: TProgEnv ContractInfo -> VM TProgUpdate
+prepareProgContracts :: VTProgEnv ContractInfo -> VM VTProgUpdate
 prepareProgContracts env = do
   prog <- currentProg env
 
@@ -138,7 +138,7 @@ prepareProgContracts env = do
       snd qf ++ " (module " ++ fst qf ++ "): " ++ err
 
 --- Initializes the results for a function by finding all associated pre- and postconditions.
-initFuncContracts :: TFuncEnv ContractInfo -> VM ContractInfo
+initFuncContracts :: VTFuncEnv ContractInfo -> VM ContractInfo
 initFuncContracts env = do
   fdecls <- currentProgFuncs env
 
@@ -151,7 +151,7 @@ initFuncContracts env = do
     }
 
 --- Verifies a single function declaration by proving the contracts.
-verifyFuncContracts :: Options -> TFuncEnv ContractInfo -> VM (TFuncUpdate ContractInfo)
+verifyFuncContracts :: Options -> VTFuncEnv ContractInfo -> VM (VTFuncUpdate ContractInfo)
 verifyFuncContracts opts env = do
   checkfun <- currentFunc
   allfuns  <- currentProgFuncs env
@@ -179,7 +179,7 @@ verifyFuncContracts opts env = do
 -- this precondition is extracted.
 -- If the proof is not successful, a precondition check is added to this call.
 
-verifyPreCondition :: Options -> TFuncEnv ContractInfo -> TAFuncDecl -> VM Cond
+verifyPreCondition :: Options -> VTFuncEnv ContractInfo -> TAFuncDecl -> VM Cond
 verifyPreCondition opts env prefun = do
   debugToEnv env $ "Verifying precondition " ++ pcname ++ "..."
   -- TODO: Implement this
@@ -192,7 +192,7 @@ verifyPreCondition opts env prefun = do
 -- a proof for the validity of the postcondition is extracted.
 -- If the proof is not successful, a postcondition check is added to `f`.
 
-verifyPostCondition :: Options -> TFuncEnv ContractInfo -> TAFuncDecl -> VM Cond
+verifyPostCondition :: Options -> VTFuncEnv ContractInfo -> TAFuncDecl -> VM Cond
 verifyPostCondition opts env postfun = failed
   -- debugToEnv env $ "Verifying postcondition " ++ pcname ++ "..."
   
@@ -703,7 +703,7 @@ showDictTypeOf te =
 -- The environment of the transformation process.
 data TransEnv = TransEnv
   { teOptions :: Options
-  , teFuncEnv :: TFuncEnv ContractInfo
+  , teFuncEnv :: VTFuncEnv ContractInfo
   }
 
 -- The state of the transformation process contains
@@ -747,7 +747,7 @@ askOptions :: TransStateM Options
 askOptions = teOptions <$> ask
 
 -- Fetches the function environment from the environment.
-askFuncEnv :: TransStateM (TFuncEnv ContractInfo)
+askFuncEnv :: TransStateM (VTFuncEnv ContractInfo)
 askFuncEnv = teFuncEnv <$> ask
 
 -- Gets the current fresh variable index of the state.

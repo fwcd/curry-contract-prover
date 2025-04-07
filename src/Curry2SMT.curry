@@ -17,7 +17,7 @@ import Numeric       ( readHex )
 import FlatCurry.Annotated.Goodies ( argTypes, resultType, unAnnFuncDecl )
 import FlatCurry.Types             ( showQName )
 import FlatCurry.ShowIntMod        ( showCurryFuncDecl )
-import Verification.Env            ( TBaseEnv )
+import Verification.Env            ( VTBaseEnv )
 
 -- Imports from package modules:
 import ESMT
@@ -37,7 +37,7 @@ import Legacy.VerifierState
 --- In order to call them correctly, a list of qualified operation names
 --- together with their non-determinism status (`True` means non-deterministic)
 --- is also returned.
-funcs2SMT :: Options -> TBaseEnv _ -> [QName]
+funcs2SMT :: Options -> VTBaseEnv _ -> [QName]
           -> IO (Command, [TAFuncDecl], [(QName,Bool)])
 funcs2SMT opts env qns = do
   funs <- getAllFunctions env (nub qns)

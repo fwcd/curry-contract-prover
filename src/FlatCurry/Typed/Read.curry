@@ -17,7 +17,7 @@ import FlatCurry.Annotated.Goodies
 import System.CurryPath              ( getLoadPathForModule, lookupModuleSource
                                      , runModuleActionQuiet, stripCurrySuffix )
 import System.FilePath               ( (</>) )
-import Verification.Env              ( TBaseEnv )
+import Verification.Env              ( VTBaseEnv, progsFromEnv, warnToEnv )
 
 import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
@@ -74,10 +74,8 @@ stripForall texp = case texp of
 ----------------------------------------------------------------------------
 --- Extract all user-defined typed FlatCurry functions that might be called
 --- by a given list of functions.
-getAllFunctions :: TBaseEnv _ -> [QName] -> IO [TAFuncDecl]
-getAllFunctions env newfuns = do
-  currmods <- readIORef vstref >>= return . currTAProgs -- FIXME
-  getAllFuncs currmods [] newfuns
+getAllFunctions :: VTBaseEnv _ -> [QName] -> IO [TAFuncDecl]
+getAllFunctions env newfuns = getAllFuncs (progsFromEnv env) [] newfuns
  where
   getAllFuncs _ currfuncs [] = return (reverse currfuncs)
   getAllFuncs currmods currfuncs (newfun:newfuncs)
@@ -93,13 +91,10 @@ getAllFunctions env newfuns = do
         (find (\fd -> funcName fd == newfun)
               (progFuncs
                  (fromJust (find (\m -> progName m == fst newfun) currmods))))
-    | otherwise -- we must load a new module
+    | otherwise -- we are missing a module
     = do let mname = fst newfun
-         opts <- readVerifyInfoRef vstref >>= return . toolOpts
-         printWhenStatus opts $
-           "Loading module '" ++ mname ++ "' for '"++ snd newfun ++"'"
-         newmod <- readTypedFlatCurryWithoutForall mname >>= return . simpProg
-         modifyIORef vstref (addProgToState newmod)
-         getAllFuncs (newmod : currmods) currfuncs (newfun:newfuncs)
+         warnToEnv env $
+           "Missing module '" ++ mname ++ "' for '"++ snd newfun ++"'"
+         getAllFuncs currmods currfuncs newfuncs
 
 ----------------------------------------------------------------------------
