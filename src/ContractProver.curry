@@ -155,12 +155,17 @@ verifyFuncContracts opts env = do
   checkfun <- currentFunc
   allfuns  <- currentProgFuncs env
 
+  -- TODO: We should make sure the framework has simplified the functions at
+  -- this point or port over simpFuncDecl
+
   let name      = funcName checkfun
       conds f   = filter (\fd -> snd (funcName fd) == encodeContractName (f name)) allfuns
       preConds  = conds toPreCondName
       postConds = conds toPostCondName
   
   -- TODO: How do we sequence changes to the function properly?
+
+  -- return (map (addPostConditionTo (funcName postfun)) allfuns) )
 
   case snd $ currentFuncName env of
     name | isPreCondName  name -> verifyPreCondition  opts env
@@ -173,69 +178,54 @@ verifyFuncContracts opts env = do
 -- this precondition is extracted.
 -- If the proof is not successful, a precondition check is added to this call.
 
-verifyPreCondition :: Options -> TFuncEnv ContractInfo -> VM (TFuncUpdate ContractInfo)
-verifyPreCondition opts env = do
+verifyPreCondition :: Options -> TFuncEnv ContractInfo -> TAFuncDecl -> VM Cond
+verifyPreCondition opts env prefun = do
   debugToEnv env $ "Verifying precondition " ++ name ++ "..."
   -- TODO: Implement this
-  return emptyVFuncUpdate
-  where
-    name = snd $ currentFuncName env
+  return $ Cond "" False
 
 ---------------------------------------------------------------------------
 -- Try to verify postconditions: If an operation `f` has a postcondition,
 -- a proof for the validity of the postcondition is extracted.
 -- If the proof is not successful, a postcondition check is added to `f`.
 
-verifyPostCondition :: Options -> TFuncEnv ContractInfo -> VM (TFuncUpdate ContractInfo)
-verifyPostCondition opts env = do
+verifyPostCondition :: Options -> TFuncEnv ContractInfo -> VM Cond
+verifyPostCondition opts env postfun = do
   debugToEnv env $ "Verifying postcondition " ++ pcname ++ "..."
   
-  postfun <- currentFunc
+  let pcname = snd (funcName postfun)
+  checkfun <- currentFunc
   allfuns <- currentProgFuncs env
 
-  -- TODO: We should make sure the framework has simplified the function at this
-  -- point or port over simpFuncDecl
+  evalTransStateM $ do
+    let (postmn,postfn) = funcName postfun
+        mainfunc        = snd (funcName checkfun)
+        orgqn           = (postmn, reverse (drop 5 (reverse postfn)))
+    -- lift $ putStrLn $ "Check postcondition of operation " ++ mainfunc
+    let farity = funcArity checkfun
+        ftype  = funcType checkfun
+        targsr = zip [1..] (argTypes ftype ++ [resultType ftype])
+    bodyformula     <- extractPostConditionProofObligation opts
+                         [1 .. farity] (farity+1) (funcRule checkfun)
+    precondformula  <- preCondExpOf opts orgqn (init targsr)
+    postcondformula <- applyFunc postfun targsr >>= pred2smt
+    let title = "verify postcondition of '" ++ mainfunc ++ "'..."
+    debugM $ "Trying to " ++ title
+    vartypes <- getVarTypes
+    pcproof <- checkImplication opts ("SMT script to " ++ title) vartypes
+                       (tConj [precondformula, bodyformula])
+                       tTrue postcondformula
+    Cond pcname <$> maybe
+      (do infoM $ mainfunc ++ ": POSTCOND CHECK ADDED"
+          return False )
+      (\proof -> do
+         unless (optNoProof opts) $ lift $
+           writeFile ("PROOF_" ++ showQNameNoDots orgqn ++ "_" ++
+                      "SatisfiesPostCondition.smt") proof
+         infoM $ mainfunc ++ ": POSTCONDITION VERIFIED"
+         return True )
+      pcproof
 
-  maybe (do putStrLn $ "Postcondition: " ++ pcname ++ "\n" ++
-                       "Operation of this postcondition not found!"
-            return allfuns)
-        --(\checkfun -> provePC checkfun) --TODO: simplify definition
-        (\checkfun -> evalTransStateM (provePC postfun (simpFuncDecl checkfun))
-                      (TransEnv opts env))
-        (find (\fd -> toPostCondName (snd (funcName fd)) ==
-                      decodeContractName pcname)
-              allfuns)
-  where
-    pcname = snd $ currentFuncName env
-
-    provePC postfun checkfun = do
-      let (postmn,postfn) = funcName postfun
-          mainfunc        = snd (funcName checkfun)
-          orgqn           = (postmn, reverse (drop 5 (reverse postfn)))
-      -- lift $ putStrLn $ "Check postcondition of operation " ++ mainfunc
-      let farity = funcArity checkfun
-          ftype  = funcType checkfun
-          targsr = zip [1..] (argTypes ftype ++ [resultType ftype])
-      bodyformula     <- extractPostConditionProofObligation opts
-                           [1 .. farity] (farity+1) (funcRule checkfun)
-      precondformula  <- preCondExpOf opts orgqn (init targsr)
-      postcondformula <- applyFunc postfun targsr >>= pred2smt
-      let title = "verify postcondition of '" ++ mainfunc ++ "'..."
-      debugM $ "Trying to " ++ title
-      vartypes <- getVarTypes
-      pcproof <- checkImplication opts ("SMT script to " ++ title) vartypes
-                         (tConj [precondformula, bodyformula])
-                         tTrue postcondformula
-      maybe
-        (do infoM $ mainfunc ++ ": POSTCOND CHECK ADDED"
-            return (map (addPostConditionTo (funcName postfun)) allfuns) )
-        (\proof -> do
-           unless (optNoProof opts) $ lift $
-             writeFile ("PROOF_" ++ showQNameNoDots orgqn ++ "_" ++
-                        "SatisfiesPostCondition.smt") proof
-           infoM $ mainfunc ++ ": POSTCONDITION VERIFIED"
-           return $ simpleVFuncUpdate $  )
-        pcproof
 
 -- If the function declaration is the declaration of the given function name,
 -- decorate it with a postcondition check.
