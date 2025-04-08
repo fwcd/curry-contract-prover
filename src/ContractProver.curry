@@ -109,7 +109,7 @@ main = do
           result <- runTypeAnnotatedVerification (contractProver opts) vopts
           case result of
             Left e  -> putStrLn ("Verification failed: " ++ e) >> exitWith 1
-            Right s -> putStrLn $ prettyVState showContractInfo
+            Right s -> putStrLn $ prettyVState showContractInfo s
 
 ---------------------------------------------------------------------------
 
