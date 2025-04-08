@@ -42,7 +42,7 @@ import System.CurryPath                  ( runModuleActionQuiet )
 import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
-import Verification.Env                  ( VTFuncEnv, VTProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, funcDeclFromEnv, typeDeclFromEnv, infoToEnv, debugToEnv )
+import Verification.Env                  ( VTFuncEnv, VTProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, funcDeclFromEnv, typeDeclFromEnv, infoToEnv, debugToEnv, baseEnv )
 import Verification.Log                  ( VLevel (..), printLog, withVLevel )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.Options              ( VOptions (..), defaultVOptions )
@@ -455,7 +455,9 @@ checkImplicationWithSMT scripttitle vartypes
                          (allQIdsOfTerm (tConj [assertion, impbindings, imp]))))
   unless (null allsyms) $ debugM $
     "Translating operations into SMT: " ++ unwords (map showQName allsyms)
-  (smtfuncs,fdecls,ndinfo) <- liftIO $ funcs2SMT allsyms
+  opts <- askOptions
+  env  <- askFuncEnv
+  (smtfuncs,fdecls,ndinfo) <- liftIO $ funcs2SMT opts (baseEnv env) allsyms
   smttypes <- genSMTTypes vartypes fdecls [assertion,impbindings,imp]
   let freshvar = maximum (map fst vartypes) + 1
       ([assertionC,impbindingsC,impC],newix) =
@@ -727,8 +729,8 @@ emptyTransState = makeTransState 0 []
 type TransStateM = StateT TransState (ReaderT TransEnv VM)
 
 -- Evaluates the trans state monad.
-evalTransStateM :: TransStateM a -> TransEnv -> IO a
-evalTransStateM m e = evalStateT (runReaderT m e) emptyTransState
+evalTransStateM :: TransStateM a -> TransEnv -> VM a
+evalTransStateM m e = runReaderT (evalStateT m emptyTransState) e
 
 -- Logs a message at the debug level.
 debugM :: String -> TransStateM ()
@@ -744,11 +746,11 @@ infoM msg = do
 
 -- Fetches the options from the environment.
 askOptions :: TransStateM Options
-askOptions = teOptions <$> ask
+askOptions = lift $ teOptions <$> ask
 
 -- Fetches the function environment from the environment.
 askFuncEnv :: TransStateM (VTFuncEnv ContractInfo)
-askFuncEnv = teFuncEnv <$> ask
+askFuncEnv = lift $ teFuncEnv <$> ask
 
 -- Gets the current fresh variable index of the state.
 getFreshVarIndex :: TransStateM Int
