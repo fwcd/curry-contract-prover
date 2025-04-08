@@ -209,43 +209,41 @@ verifyPreCondition opts env prefun = do
 -- If the proof is not successful, a postcondition check is added to `f`.
 
 verifyPostCondition :: Options -> VTFuncEnv ContractInfo -> TAFuncDecl -> VM Cond
-verifyPostCondition opts env postfun = failed
-  -- debugToEnv env $ "Verifying postcondition " ++ pcname ++ "..."
+verifyPostCondition opts env postfun = do
+  debugToEnv env $ "Verifying postcondition " ++ pcname ++ "..."
   
-  -- checkfun <- currentFunc
-  -- allfuns <- currentProgFuncs env
+  let checkfun = currentFunc env
 
-  -- evalTransStateM $ do
-  --   let (postmn,postfn) = funcName postfun
-  --       mainfunc        = snd (funcName checkfun)
-  --       orgqn           = (postmn, reverse (drop 5 (reverse postfn)))
-  --   -- lift $ putStrLn $ "Check postcondition of operation " ++ mainfunc
-  --   let farity = funcArity checkfun
-  --       ftype  = funcType checkfun
-  --       targsr = zip [1..] (argTypes ftype ++ [resultType ftype])
-  --   bodyformula     <- extractPostConditionProofObligation opts
-  --                        [1 .. farity] (farity+1) (funcRule checkfun)
-  --   precondformula  <- preCondExpOf opts orgqn (init targsr)
-  --   postcondformula <- applyFunc postfun targsr >>= pred2smt
-  --   let title = "verify postcondition of '" ++ mainfunc ++ "'..."
-  --   debugM $ "Trying to " ++ title
-  --   vartypes <- getVarTypes
-  --   pcproof <- checkImplication opts ("SMT script to " ++ title) vartypes
-  --                      (tConj [precondformula, bodyformula])
-  --                      tTrue postcondformula
-  --   Cond pcname <$> maybe
-  --     (do infoM $ mainfunc ++ ": POSTCOND CHECK ADDED"
-  --         return False )
-  --     (\proof -> do
-  --        unless (optNoProof opts) $ lift $
-  --          writeFile ("PROOF_" ++ showQNameNoDots orgqn ++ "_" ++
-  --                     "SatisfiesPostCondition.smt") proof
-  --        infoM $ mainfunc ++ ": POSTCONDITION VERIFIED"
-  --        return True )
-  --     pcproof
+  flip evalTransStateM (TransEnv opts env) $ do
+    let (postmn,postfn) = funcName postfun
+        mainfunc        = snd (funcName checkfun)
+        orgqn           = (postmn, reverse (drop 5 (reverse postfn)))
+    let farity = funcArity checkfun
+        ftype  = funcType checkfun
+        targsr = zip [1..] (argTypes ftype ++ [resultType ftype])
+    bodyformula     <- extractPostConditionProofObligation
+                         [1 .. farity] (farity+1) (funcRule checkfun)
+    precondformula  <- preCondExpOf orgqn (init targsr)
+    postcondformula <- applyFunc postfun targsr >>= pred2smt
+    let title = "verify postcondition of '" ++ mainfunc ++ "'..."
+    debugM $ "Trying to " ++ title
+    vartypes <- getVarTypes
+    pcproof <- checkImplication ("SMT script to " ++ title) vartypes
+                       (tConj [precondformula, bodyformula])
+                       tTrue postcondformula
+    Cond pcname <$> maybe
+      (do infoM $ mainfunc ++ ": POSTCOND CHECK ADDED"
+          return False )
+      (\proof -> do
+         unless (optNoProof opts) $ liftIO $
+           writeFile ("PROOF_" ++ showQNameNoDots orgqn ++ "_" ++
+                      "SatisfiesPostCondition.smt") proof
+         infoM $ mainfunc ++ ": POSTCONDITION VERIFIED"
+         return True )
+      pcproof
 
-  -- where
-  --   pcname = snd (funcName postfun)
+  where
+    pcname = snd (funcName postfun)
 
 
 -- Decorate the given function with a precondition check:
