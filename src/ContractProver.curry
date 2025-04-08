@@ -13,7 +13,7 @@
 
 module ContractProver where
 
-import Control.Monad      ( unless, when )
+import Control.Monad          ( unless, when )
 import Control.Monad.IO.Class ( liftIO )
 import Data.IORef
 import Data.List          ( elemIndex, find, init, isPrefixOf, last, maximum
@@ -26,7 +26,8 @@ import Contract.Names
 import Contract.Usage                    ( checkContractUsage )
 import Control.Monad.Trans.Class         ( lift )
 import Control.Monad.Trans.Reader        ( ReaderT, runReaderT, ask )
-import Control.Monad.Trans.State         ( StateT, get, put, evalStateT )
+import Control.Monad.Trans.State         ( StateT (..), get, put, evalStateT, execStateT, modify )
+import Control.Monad.Trans.Writer        ( WriterT (..), runWriter )
 import System.FilePath                   ( (</>) )
 import FlatCurry.Files
 import FlatCurry.Types
@@ -49,7 +50,7 @@ import Verification.Options              ( VOptions (..), defaultVOptions )
 import Verification.Monad                ( VM, throwVM )
 import Verification.State                ( prettyVState )
 import Verification.Types                ( TVerification, Verification (..), emptyVerification )
-import Verification.Update               ( VTFuncUpdate, VTProgUpdate, simpleVFuncUpdate, emptyVProgUpdate, emptyVFuncUpdate )
+import Verification.Update               ( VFuncUpdate (..), VTFuncUpdate, VTProgUpdate, simpleVFuncUpdate, emptyVProgUpdate, emptyVFuncUpdate )
 
 -- Imports from package modules:
 import ContractInfo             ( Cond (..), ContractInfo (..), emptyContractInfo, showContractInfo )
@@ -61,7 +62,7 @@ import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
 import FlatCurry.Typed.Simplify ( simpProg, simpFuncDecl, simpExpr )
 import FlatCurry.Typed.Types
-import Legacy.ContractProver    ( proveContracts )
+import Legacy.ContractProver    ( proveContracts, verifyPreConditions )
 import PackageConfig            ( getPackagePath )
 import ToolOptions
 
@@ -144,34 +145,49 @@ initFuncContracts env = do
 
   let name            = snd $ currentFuncName env
       funcsMatching f = filter (== f name) $ snd . funcName <$> fdecls
+      mkCond          = flip Cond False
 
   return $ emptyContractInfo
-    { ciPreConds  = funcsMatching toPreCondName
-    , ciPostConds = funcsMatching toPostCondName
+    { ciPreConds  = mkCond <$> funcsMatching toPreCondName
+    , ciPostConds = mkCond <$> funcsMatching toPostCondName
     }
 
 --- Verifies a single function declaration by proving the contracts.
 verifyFuncContracts :: Options -> VTFuncEnv ContractInfo -> VM (VTFuncUpdate ContractInfo)
 verifyFuncContracts opts env = do
-  checkfun <- currentFunc
   allfuns  <- currentProgFuncs env
 
   -- TODO: We should make sure the framework has simplified the functions at
   -- this point or port over simpFuncDecl
 
-  let name      = funcName checkfun
-      conds f   = filter (\fd -> snd (funcName fd) == encodeContractName (f name)) allfuns
-      preConds  = conds toPreCondName
-      postConds = conds toPostCondName
+  let checkfun   = currentFunc env
+      name       = snd $ funcName checkfun
+      condfuns f = filter (\fd -> snd (funcName fd) == encodeContractName (f name)) allfuns
+      prefuns    = condfuns toPreCondName
+      postfuns   = condfuns toPostCondName
   
-  -- TODO: How do we sequence changes to the function properly?
+  -- Verify associated pre/postcondition functions
+  preConds  <- mapM (verifyPreCondition opts env) prefuns
+  postConds <- mapM (verifyPreCondition opts env) postfuns
+  
+  -- Add runtime checks for unverified pre/postconditions
+  let (checkfun', newfuns) =
+        runWriter . flip execStateT checkfun $ do
+          when (anyUnverified postConds) $
+            modify addPostCondition
+          when (anyUnverified preConds) $
+            modifyM (WriterT . return . addPreCondition)
 
-  -- return (map (addPostConditionTo (funcName postfun)) allfuns) )
-
-  case snd $ currentFuncName env of
-    name | isPreCondName  name -> verifyPreCondition  opts env
-         | isPostCondName name -> verifyPostCondition opts env
-         | otherwise           -> return emptyVFuncUpdate
+  return $ emptyVFuncUpdate
+    { vfuUpdatedFunc = Just checkfun'
+    , vfuUpdatedInfo = Just $ ContractInfo preConds postConds
+    , vfuAddedFuncs  = newfuns
+    }
+  where
+    anyUnverified = isJust . find (not . cVerified)
+    -- FIXME: Replace with upstream version once
+    -- https://github.com/curry-packages/transformers/pull/2 is merged
+    modifyM f     = StateT $ \s -> (\s' -> ((), s')) <$> f s
 
 ---------------------------------------------------------------------------
 -- Try to verify preconditions: If an operation `f` occurring in some
@@ -232,13 +248,30 @@ verifyPostCondition opts env postfun = failed
   --   pcname = snd (funcName postfun)
 
 
--- If the function declaration is the declaration of the given function name,
--- decorate it with a postcondition check.
-addPostConditionTo :: QName -> TAFuncDecl -> TAFuncDecl
-addPostConditionTo pfname fdecl = let fn = funcName fdecl in
-  if toPostCondQName fn == pfname
-    then updFuncBody (const (addPostConditionCheck fn (funcRule fdecl))) fdecl
-    else fdecl
+-- Decorate the given function with a precondition check:
+-- If an operation `f` has some precondition `f'pre`,
+-- replace the rule `f xs = rhs` by the following rules:
+--
+--     f xs = checkPreCond (f'NOCHECK xs) (f'pre xs) "f" xs
+--     f'NOCHECK xs = rhs
+addPreCondition :: TAFuncDecl -> (TAFuncDecl, [TAFuncDecl])
+addPreCondition fdecl@(AFunc qf ar vis fty rule) =
+  let newrule = checkPreCondRule qf rule
+  in (updFuncRule (const newrule) fdecl,
+      [AFunc (toNoCheckQName qf) ar vis fty rule])
+  where
+    checkPreCondRule :: QName -> TARule -> TARule
+    checkPreCondRule qn (ARule rty rargs _) =
+      ARule rty rargs (addPreConditionCheck rty FuncCall qn rty
+                        (map (\ (v,t) -> AVar t v) rargs))
+    checkPreCondRule qn (AExternal _ _) = error $
+      "addPreConditions: cannot add precondition to external operation '" ++
+      snd qn ++ "'!"
+
+-- Decorate the given function with a postcondition check.
+addPostCondition :: TAFuncDecl -> TAFuncDecl
+addPostCondition fdecl = updFuncBody (const (addPostConditionCheck fn (funcRule fdecl))) fdecl
+  where fn = funcName fdecl
 
 
 extractPostConditionProofObligation :: [Int] -> Int -> TARule

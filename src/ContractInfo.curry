@@ -13,14 +13,12 @@ data Cond = Cond
 data ContractInfo = ContractInfo
   { ciPreConds  :: [Cond] -- The contract's preconditions
   , ciPostConds :: [Cond] -- The contract's postconditions
-  , ciHold      :: Bool   -- Whether the postconditions hold
   }
 
 emptyContractInfo :: ContractInfo
 emptyContractInfo = ContractInfo
   { ciPreConds  = []
   , ciPostConds = []
-  , ciHold      = False
   }
 
 --- Shows the statistics in human-readable format.
