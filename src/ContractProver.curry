@@ -168,7 +168,7 @@ verifyFuncContracts opts env = do
   
   -- Verify associated pre/postcondition functions
   preConds  <- mapM (verifyPreCondition opts env) prefuns
-  postConds <- mapM (verifyPreCondition opts env) postfuns
+  postConds <- mapM (verifyPostCondition opts env) postfuns
   
   -- Add runtime checks for unverified pre/postconditions
   let (checkfun', newfuns) =
