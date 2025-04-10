@@ -19,6 +19,7 @@ import Data.IORef
 import Data.List          ( elemIndex, find, init, isPrefixOf, last, maximum
                           , minimum, nub, partition, splitOn, union )
 import Data.Maybe         ( catMaybes, isJust, isNothing )
+import Data.Monoid        ( All (..) )
 import System.Environment ( getArgs, getEnv )
 
 -- Imports from dependencies:
@@ -26,8 +27,8 @@ import Contract.Names
 import Contract.Usage                    ( checkContractUsage )
 import Control.Monad.Trans.Class         ( lift )
 import Control.Monad.Trans.Reader        ( ReaderT, runReaderT, ask )
-import Control.Monad.Trans.State         ( StateT (..), get, put, evalStateT, execStateT, modify )
-import Control.Monad.Trans.Writer        ( WriterT (..), runWriter )
+import Control.Monad.Trans.State         ( StateT (..), get, put, evalStateT, execStateT, modify, withStateT )
+import Control.Monad.Trans.Writer        ( WriterT (..), runWriter, tell )
 import System.FilePath                   ( (</>) )
 import FlatCurry.Files
 import FlatCurry.Types
@@ -194,6 +195,101 @@ verifyPreCondition prefun = do
   where
     pcname = snd (funcName prefun)
 
+optPreConditionInRule :: QName -> TARule -> TransM (TARule, All)
+optPreConditionInRule _ rl@(AExternal _ _) = return (rl, mempty)
+optPreConditionInRule qn@(_,fn) (ARule rty rargs rhs) = do
+  let targs = zip [1..] (map snd rargs)
+  st <- derivedTransState (maximum (0 : map fst rargs ++ allVars rhs) + 1) rargs
+  withTransState st . runWriterT $ do
+    -- compute precondition of operation:
+    precondformula <- lift $ preCondExpOf qn targs
+    lift $ setAssertion precondformula
+    newrhs <- optPreCondInExp rhs
+    return (ARule rty rargs newrhs)
+ where
+  -- We use the Writer monad with the All monoid to track whether all
+  -- preconditions in the expression could be verified.
+  optPreCondInExp :: TAExpr -> WriterT All TransM TAExpr
+  optPreCondInExp exp = case exp of
+    AComb ty ct (qf,tys) args ->
+      if qf == ("Prelude","?") && length args == 2
+        then optPreCondInExp (AOr ty (args!!0) (args!!1))
+        else do
+          precond <- lift getAssertion
+          nargs <- mapM optPreCondInExp args
+          allPreConds <- map funcName <$> lift currentProgPreConds
+          if toPreCondQName qf `elem` allPreConds
+            then do
+              lift . debugM $ "Checking call to " ++ snd qf
+              (bs,_)   <- lift $ normalizeArgs nargs
+              bindexps <- lift $ mapM (binding2SMT True) bs
+              precondcall <- lift $ preCondExpOf qf
+                               (zip (map fst bs) (map annExpr args))
+              -- TODO: select from 'bindexps' only demanded argument positions
+              let title = "SMT script to verify precondition of '" ++ snd qf ++
+                          "' in function '" ++ fn ++ "'"
+              vartypes <- lift getVarTypes
+              pcproof <- lift $
+                checkImplication title vartypes
+                                 precond (tConj bindexps) precondcall
+              let pcvalid = isJust pcproof
+              if pcvalid
+                then do
+                  lift . infoM $ fn ++ ": PRECONDITION OF '" ++ snd qf ++ "': VERIFIED"
+                  tell (All True)
+                  return $ AComb ty ct (toNoCheckQName qf, tys) nargs
+                else do
+                  lift . infoM $ fn ++ ": PRECOND CHECK ADDED TO '" ++ snd qf ++ "'"
+                  return $ AComb ty ct (qf,tys) nargs
+            else return $ AComb ty ct (qf,tys) nargs
+    ACase ty ct e brs -> do
+      ne <- optPreCondInExp e
+      freshvar <- lift getFreshVar
+      be <- lift $ binding2SMT True (freshvar,ne)
+      lift $ do
+        addToAssertion be
+        addVarTypes [ (freshvar, annExpr ne) ]
+      nbrs <- mapM (optPreCondInBranch freshvar) brs
+      return $ ACase ty ct ne nbrs
+    AOr ty e1 e2 -> do
+      ne1 <- optPreCondInExp e1
+      ne2 <- optPreCondInExp e2
+      return $ AOr ty ne1 ne2
+    ALet ty bs e -> do
+      nes <- mapM optPreCondInExp (map snd bs)
+      ne  <- optPreCondInExp e
+      return $ ALet ty (zip (map fst bs) nes) ne
+    AFree ty fvs e -> do
+      ne <- optPreCondInExp e
+      return $ AFree ty fvs ne
+    ATyped ty e et -> do
+      ne <- optPreCondInExp e
+      return $ ATyped ty ne et
+    _ -> return exp
+
+  optPreCondInBranch dvar branch = do
+    ABranch p e <- lift $ renamePatternVars branch
+    lift $ addToAssertion (tEquVar dvar (pat2SMT p))
+    ne <- optPreCondInExp e
+    return (ABranch p ne)
+
+-- Rename argument variables of constructor pattern
+renamePatternVars :: TABranchExpr -> TransM TABranchExpr
+renamePatternVars (ABranch p e) =
+  if isConsPattern p
+    then do
+      fv <- getFreshVarIndex
+      let args = map fst (patArgs p)
+          minarg = minimum (0 : args)
+          maxarg = maximum (0 : args)
+          rnm i = if i `elem` args then i - minarg + fv else i
+          nargs = map (\ (v,t) -> (rnm v,t)) (patArgs p)
+      setFreshVarIndex (fv + maxarg - minarg + 1)
+      addVarTypes nargs
+      return $ ABranch (updPatArgs (map (\ (v,t) -> (rnm v,t))) p)
+                       (rnmAllVars rnm e)
+    else return $ ABranch p e
+
 ---------------------------------------------------------------------------
 -- Try to verify postconditions: If an operation `f` has a postcondition,
 -- a proof for the validity of the postcondition is extracted.
@@ -223,6 +319,7 @@ verifyPostCondition postfun = do
                       tTrue postcondformula
   Cond pcname <$> maybe
     (do infoM $ mainfunc ++ ": POSTCOND CHECK ADDED"
+        modifyFunc addPostCondition
         return False )
     (\proof -> do
         opts <- askOptions
@@ -271,9 +368,9 @@ extractPostConditionProofObligation args resvar
                                     (ARule ty orgargs orgexp) = do
   let exp    = rnmAllVars renameRuleVar orgexp
       rtype  = resType (length orgargs) (stripForall ty)
-  modify $ \s -> makeTransState (maximum (resvar : allVars exp) + 1)
-                                ((resvar, rtype) : zip args (map snd orgargs))
-                                (func s)
+  derivedTransState (maximum (resvar : allVars exp) + 1)
+                    ((resvar, rtype) : zip args (map snd orgargs))
+                    >>= put
   binding2SMT True (resvar,exp)
  where
   maxArgResult = maximum (resvar : args)
@@ -287,6 +384,13 @@ extractPostConditionProofObligation args resvar
       else case te of
              FuncType _ rt -> resType (n-1) rt
              _             -> error $ "Internal errror: resType: " ++ show te
+
+-- Fetches all preconditions in the current module.
+currentProgPreConds :: TransM [TAFuncDecl]
+currentProgPreConds = do
+  env <- askFuncEnv
+  fdecls <- liftVM $ currentProgFuncs env
+  return $ filter (isPreCondName . snd . funcName) fdecls
 
 -- Returns the precondition expression for a given operation
 -- and its arguments (which are assumed to be variable indices).
@@ -695,35 +799,6 @@ showDictTypeOf :: TypeExpr -> TypeExpr
 showDictTypeOf te =
   FlatCurry.Typed.Build.unitType ~> TCons ("Prelude","_Dict#Show") [te]
 
--- ------------------------------------------------------------------------------
--- -- Add (non-trivial) preconditions:
--- -- If an operation `f` has some precondition `f'pre`,
--- -- replace the rule `f xs = rhs` by the following rules:
--- --
--- --     f xs = checkPreCond (f'NOCHECK xs) (f'pre xs) "f" xs
--- --     f'NOCHECK xs = rhs
--- addPreConditions :: TAProg -> IORef VState -> IO TAProg
--- addPreConditions prog vstref = do
---   newfuns  <- mapM addPreCondition (progFuncs prog)
---   return (updProgFuncs (const (concat newfuns)) prog)
---  where
---   addPreCondition fdecl@(AFunc qf ar vis fty rule) = do
---     ti <- readVerifyInfoRef vstref
---     return $
---       if toPreCondQName qf `elem` map funcName (preConds ti)
---         then let newrule = checkPreCondRule qf rule
---              in [updFuncRule (const newrule) fdecl,
---                  AFunc (toNoCheckQName qf) ar vis fty rule]
---         else [fdecl]
-
---   checkPreCondRule :: QName -> TARule -> TARule
---   checkPreCondRule qn (ARule rty rargs _) =
---     ARule rty rargs (addPreConditionCheck rty FuncCall qn rty
---                        (map (\ (v,t) -> AVar t v) rargs))
---   checkPreCondRule qn (AExternal _ _) = error $
---     "addPreConditions: cannot add precondition to external operation '" ++
---     snd qn ++ "'!"
-
 ---------------------------------------------------------------------------
 -- The environment of the transformation process.
 data TransEnv = TransEnv
@@ -766,6 +841,20 @@ runTransStateM m e fd = do
   ((x, ts), fs) <- runWriterT (runReaderT (runStateT m (defaultTransState fd)) e)
   return $ TransOutput x (func ts) fs
 
+-- Lifts a verification monad action to the transformation monad.
+liftVM :: VM a -> TransM a
+liftVM = lift . lift . lift
+
+-- Creates a state with the same function and updated fresh vars/types.
+derivedTransState :: Int -> [(Int,TypeExpr)] -> TransM TransState
+derivedTransState fv vts = do
+  s <- get
+  return $ makeTransState fv vts (func s)
+
+-- Runs a subcomputation with the given state.
+withTransState :: TransState -> TransM a -> TransM a
+withTransState = withStateT . const
+
 -- Logs a message at the debug level.
 debugM :: String -> TransM ()
 debugM msg = do
@@ -785,6 +874,20 @@ askOptions = lift $ teOptions <$> ask
 -- Fetches the function environment from the environment.
 askFuncEnv :: TransM (VTFuncEnv ContractInfo)
 askFuncEnv = lift $ teFuncEnv <$> ask
+
+-- Modifies the function.
+modifyFunc :: (TAFuncDecl -> TAFuncDecl) -> TransM ()
+modifyFunc f = modify $ \s -> s { func = f (func s) }
+
+-- Modifies the function and adds new ones.
+modifyAddFuncs :: (TAFuncDecl -> (TAFuncDecl, [TAFuncDecl])) -> TransM ()
+modifyAddFuncs f = modifyM $ \s -> do
+  let (func', added) = f (func s)
+  lift $ tell added
+  return $ s { func = func' }
+  -- FIXME: Replace with upstream version once
+  -- https://github.com/curry-packages/transformers/pull/2 is merged
+  where modifyM a = StateT $ \s -> (\s' -> ((), s')) <$> a s
 
 -- Gets the current fresh variable index of the state.
 getFreshVarIndex :: TransM Int
