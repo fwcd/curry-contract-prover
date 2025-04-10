@@ -846,6 +846,10 @@ runTransStateM m e fd = do
 liftVM :: VM a -> TransM a
 liftVM = lift . lift . lift
 
+-- Throws an error in the transformation monad.
+throwM :: String -> TransM _
+throwM = liftVM . throwVM
+
 -- Creates a state with the same function and updated fresh vars/types.
 derivedTransState :: Int -> [(Int,TypeExpr)] -> TransM TransState
 derivedTransState fv vts = do
