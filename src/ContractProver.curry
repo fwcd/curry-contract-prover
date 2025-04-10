@@ -185,7 +185,7 @@ verifyFuncContracts opts env = do
 -- this precondition is extracted.
 -- If the proof is not successful, a precondition check is added to this call.
 
-verifyPreCondition :: TAFuncDecl -> TransStateM Cond
+verifyPreCondition :: TAFuncDecl -> TransM Cond
 verifyPreCondition prefun = do
   env <- askFuncEnv
   debugToEnv env $ "Verifying precondition " ++ pcname ++ "..."
@@ -199,7 +199,7 @@ verifyPreCondition prefun = do
 -- a proof for the validity of the postcondition is extracted.
 -- If the proof is not successful, a postcondition check is added to `f`.
 
-verifyPostCondition :: TAFuncDecl -> TransStateM Cond
+verifyPostCondition :: TAFuncDecl -> TransM Cond
 verifyPostCondition postfun = do
   env <- askFuncEnv
   debugToEnv env $ "Verifying postcondition " ++ pcname ++ "..."
@@ -264,7 +264,7 @@ addPostCondition fdecl = updFuncBody (const (addPostConditionCheck fn (funcRule 
 
 
 extractPostConditionProofObligation :: [Int] -> Int -> TARule
-                                    -> TransStateM Term
+                                    -> TransM Term
 extractPostConditionProofObligation _ _ (AExternal _ s) =
   return $ tComb ("External: " ++ s) []
 extractPostConditionProofObligation args resvar
@@ -291,7 +291,7 @@ extractPostConditionProofObligation args resvar
 -- Returns the precondition expression for a given operation
 -- and its arguments (which are assumed to be variable indices).
 -- Rename all local variables by adding the `freshvar` index to them.
-preCondExpOf :: QName -> [(Int,TypeExpr)] -> TransStateM Term
+preCondExpOf :: QName -> [(Int,TypeExpr)] -> TransM Term
 preCondExpOf qf args = do
   env <- askFuncEnv
   maybe (return tTrue)
@@ -302,7 +302,7 @@ preCondExpOf qf args = do
 -- and its arguments (which are assumed to be variable indices).
 -- Rename all local variables by adding `freshvar` to them and
 -- return the new freshvar value.
-postCondExpOf :: QName -> [(Int,TypeExpr)] -> TransStateM Term
+postCondExpOf :: QName -> [(Int,TypeExpr)] -> TransM Term
 postCondExpOf qf args = do
   env <- askFuncEnv
   maybe (return tTrue)
@@ -314,7 +314,7 @@ postCondExpOf qf args = do
 -- the renamed body of the function declaration.
 -- All local variables are renamed by adding `freshvar` to them.
 -- Also the new fresh variable index is returned.
-applyFunc :: TAFuncDecl -> [(Int,TypeExpr)] -> TransStateM TAExpr
+applyFunc :: TAFuncDecl -> [(Int,TypeExpr)] -> TransM TAExpr
 applyFunc fdecl targs = do
   fv <- getFreshVarIndex
   let tsub = maybe (error $ "applyFunc: types\n" ++
@@ -341,7 +341,7 @@ applyFunc fdecl targs = do
     in applyArgs e_v vs
 
 -- Translates a Boolean FlatCurry expression into an SMT formula.
-pred2smt :: TAExpr -> TransStateM Term
+pred2smt :: TAExpr -> TransM Term
 pred2smt exp = case exp of
   AVar _ i              -> return (TSVar i)
   ALit _ l              -> return (lit2SMT l)
@@ -366,7 +366,7 @@ pred2smt exp = case exp of
 -- Moreover, the returned state contains also the types of all fresh variables.
 -- If the first argument is `False`, the expression is not strictly demanded,
 -- i.e., possible contracts of it (if it is a function call) are ignored.
-binding2SMT :: Bool -> (Int,TAExpr) -> TransStateM Term
+binding2SMT :: Bool -> (Int,TAExpr) -> TransM Term
 binding2SMT odemanded (oresvar,oexp) =
   exp2smt odemanded (oresvar, simpExpr oexp)
  where
@@ -438,7 +438,7 @@ binding2SMT odemanded (oresvar,oexp) =
                           ALit _ l -> lit2SMT l
                           _        -> error $ "Not normalized: " ++ show e
 
-normalizeArgs :: [TAExpr] -> TransStateM ([(Int,TAExpr)],[TAExpr])
+normalizeArgs :: [TAExpr] -> TransM ([(Int,TAExpr)],[TAExpr])
 normalizeArgs [] = return ([],[])
 normalizeArgs (e:es) = case e of
   AVar _ i -> do (bs,nes) <- normalizeArgs es
@@ -456,7 +456,7 @@ unzipBranches (ABranch p e : brs) = (p:xs,e:ys)
 
 ---------------------------------------------------------------------------
 checkImplication :: String -> [(Int,TypeExpr)]
-                 -> Term -> Term -> Term -> TransStateM (Maybe String)
+                 -> Term -> Term -> Term -> TransM (Maybe String)
 checkImplication scripttitle vartypes assertion impbindings imp = do
   opts <- askOptions
   if optVerify opts
@@ -469,7 +469,7 @@ checkImplication scripttitle vartypes assertion impbindings imp = do
 -- Returns `Nothing` if the proof was not successful, otherwise
 -- the SMT script containing the proof (to obtain `unsat`) is returned.
 checkImplicationWithSMT :: String -> [(Int,TypeExpr)]
-                        -> Term -> Term -> Term -> TransStateM (Maybe String)
+                        -> Term -> Term -> Term -> TransM (Maybe String)
 checkImplicationWithSMT scripttitle vartypes
                         assertion impbindings imp = do
   let allsyms = catMaybes
@@ -514,7 +514,7 @@ checkImplicationWithSMT scripttitle vartypes
 -- Computes SMT type declarations for all types occurring in the
 -- variable types, function declarations, or as sorts in SMT terms.
 genSMTTypes :: [(Int,TypeExpr)] -> [TAFuncDecl] -> [Term]
-            -> TransStateM [Command]
+            -> TransM [Command]
 genSMTTypes vartypes fdecls smtterms = do
   let -- all types occurring in function declarations and variable types:
       alltypes = concatMap typesOfFunc fdecls ++ map snd vartypes
@@ -536,7 +536,7 @@ genSMTTypes vartypes fdecls smtterms = do
 
 -- Calls the SMT solver (with a timeout of 2secs) on a given SMTLIB script.
 -- Returns `Just` the SMT script if the result is `unsat`, otherwise `Nothing`.
-callSMT :: String -> TransStateM (Maybe String)
+callSMT :: String -> TransM (Maybe String)
 callSMT smtinput = do
   opts <- askOptions
   debugM $ "SMT SCRIPT:\n" ++ showWithLineNums smtinput
@@ -757,75 +757,74 @@ defaultTransState :: TAFuncDecl -> TransState
 defaultTransState = makeTransState 0 []
 
 -- The type of the state monad contains the transformation state.
---type TransStateM a = State TransState a
-type TransStateM = StateT TransState (ReaderT TransEnv (WriterT [TAFuncDecl] VM))
+type TransM = StateT TransState (ReaderT TransEnv (WriterT [TAFuncDecl] VM))
 
 -- Runs the trans state monad, returning the value, the transformed function and
 -- any newly added function declarations.
-runTransStateM :: TransStateM a -> TransEnv -> TAFuncDecl -> VM (TransOutput a)
+runTransStateM :: TransM a -> TransEnv -> TAFuncDecl -> VM (TransOutput a)
 runTransStateM m e fd = do
   ((x, ts), fs) <- runWriterT (runReaderT (runStateT m (defaultTransState fd)) e)
   return $ TransOutput x (func ts) fs
 
 -- Logs a message at the debug level.
-debugM :: String -> TransStateM ()
+debugM :: String -> TransM ()
 debugM msg = do
   env <- askFuncEnv
   debugToEnv env msg
 
 -- Logs a message at the info level.
-infoM :: String -> TransStateM ()
+infoM :: String -> TransM ()
 infoM msg = do
   env <- askFuncEnv
   infoToEnv env msg
 
 -- Fetches the options from the environment.
-askOptions :: TransStateM Options
+askOptions :: TransM Options
 askOptions = lift $ teOptions <$> ask
 
 -- Fetches the function environment from the environment.
-askFuncEnv :: TransStateM (VTFuncEnv ContractInfo)
+askFuncEnv :: TransM (VTFuncEnv ContractInfo)
 askFuncEnv = lift $ teFuncEnv <$> ask
 
 -- Gets the current fresh variable index of the state.
-getFreshVarIndex :: TransStateM Int
+getFreshVarIndex :: TransM Int
 getFreshVarIndex = get >>= return . freshVar
 
 -- Sets the fresh variable index in the state.
-setFreshVarIndex :: Int -> TransStateM ()
+setFreshVarIndex :: Int -> TransM ()
 setFreshVarIndex fvi = do
   st <- get
   put $ st { freshVar = fvi }
 
 -- Gets a fresh variable index and increment the index in the state.
-getFreshVar :: TransStateM Int
+getFreshVar :: TransM Int
 getFreshVar = do
   st <- get
   put $ st { freshVar = freshVar st + 1 }
   return $ freshVar st
 
 -- Gets the variables and their types stored in the state.
-getVarTypes :: TransStateM [(Int,TypeExpr)]
+getVarTypes :: TransM [(Int,TypeExpr)]
 getVarTypes = get >>= return . varTypes
 
 -- Adds variables and their types to the state.
-addVarTypes :: [(Int,TypeExpr)] -> TransStateM ()
+addVarTypes :: [(Int,TypeExpr)] -> TransM ()
 addVarTypes vts = do
   st <- get
   put $ st { varTypes = vts ++ varTypes st }
 
 -- Gets the current assertion stored in the state.
-getAssertion :: TransStateM Term
+getAssertion :: TransM Term
 getAssertion = get >>= return . cAssertion
 
 -- Sets the current assertion in the state.
-setAssertion :: Term -> TransStateM ()
+setAssertion :: Term -> TransM ()
 setAssertion formula = do
   st <- get
   put $ st { cAssertion = formula }
 
 -- Add a formula to the current assertion in the state by conjunction.
-addToAssertion :: Term -> TransStateM ()
+addToAssertion :: Term -> TransM ()
 addToAssertion formula = do
   st <- get
   put $ st { cAssertion = tConj [cAssertion st, formula] }
