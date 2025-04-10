@@ -63,7 +63,7 @@ import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
 import FlatCurry.Typed.Simplify ( simpProg, simpFuncDecl, simpExpr )
 import FlatCurry.Typed.Types
-import Legacy.ContractProver    ( proveContracts, verifyPreConditions )
+import Legacy.ContractProver    ( proveContracts )
 import PackageConfig            ( getPackagePath )
 import ToolOptions
 
