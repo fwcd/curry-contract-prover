@@ -72,7 +72,7 @@ import ToolOptions
 banner :: String
 banner = unlines [bannerLine, bannerText, bannerLine]
  where
-  bannerText = "Contract Checking/Verification Tool (Version of 26/10/24)"
+  bannerText = "Contract Checking/Verification Tool (Verification Framework Alpha)"
   bannerLine = take (length bannerText) (repeat '=')
 
 ---------------------------------------------------------------------------
