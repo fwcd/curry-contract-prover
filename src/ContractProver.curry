@@ -167,27 +167,17 @@ verifyFuncContracts opts env = do
       postfuns   = condfuns toPostCondName
   
   -- Verify associated pre/postcondition functions
-  preConds  <- mapM (verifyPreCondition opts env) prefuns
-  postConds <- mapM (verifyPostCondition opts env) postfuns
+  TransOutput info checkfun' addedfuns <-
+    (\m -> runTransStateM m (TransEnv opts env) checkfun) $ do
+      preConds  <- mapM verifyPreCondition  prefuns
+      postConds <- mapM verifyPostCondition postfuns
+      return $ ContractInfo preConds postConds
   
-  -- Add runtime checks for unverified pre/postconditions
-  let (checkfun', newfuns) =
-        runWriter . flip execStateT checkfun $ do
-          when (anyUnverified postConds) $
-            modify addPostCondition
-          when (anyUnverified preConds) $
-            modifyM (WriterT . return . addPreCondition)
-
   return $ emptyVFuncUpdate
     { vfuUpdatedFunc = Just checkfun'
-    , vfuUpdatedInfo = Just $ ContractInfo preConds postConds
-    , vfuAddedFuncs  = newfuns
+    , vfuUpdatedInfo = Just info
+    , vfuAddedFuncs  = addedfuns
     }
-  where
-    anyUnverified = isJust . find (not . cVerified)
-    -- FIXME: Replace with upstream version once
-    -- https://github.com/curry-packages/transformers/pull/2 is merged
-    modifyM f     = StateT $ \s -> (\s' -> ((), s')) <$> f s
 
 ---------------------------------------------------------------------------
 -- Try to verify preconditions: If an operation `f` occurring in some
@@ -195,8 +185,9 @@ verifyFuncContracts opts env = do
 -- this precondition is extracted.
 -- If the proof is not successful, a precondition check is added to this call.
 
-verifyPreCondition :: Options -> VTFuncEnv ContractInfo -> TAFuncDecl -> VM Cond
-verifyPreCondition opts env prefun = do
+verifyPreCondition :: TAFuncDecl -> TransStateM Cond
+verifyPreCondition prefun = do
+  env <- askFuncEnv
   debugToEnv env $ "Verifying precondition " ++ pcname ++ "..."
   -- TODO: Implement this
   return $ Cond "" False
@@ -208,39 +199,39 @@ verifyPreCondition opts env prefun = do
 -- a proof for the validity of the postcondition is extracted.
 -- If the proof is not successful, a postcondition check is added to `f`.
 
-verifyPostCondition :: Options -> VTFuncEnv ContractInfo -> TAFuncDecl -> VM Cond
-verifyPostCondition opts env postfun = do
+verifyPostCondition :: TAFuncDecl -> TransStateM Cond
+verifyPostCondition postfun = do
+  env <- askFuncEnv
   debugToEnv env $ "Verifying postcondition " ++ pcname ++ "..."
   
-  let checkfun = currentFunc env
-
-  flip evalTransStateM (TransEnv opts env) $ do
-    let (postmn,postfn) = funcName postfun
-        mainfunc        = snd (funcName checkfun)
-        orgqn           = (postmn, reverse (drop 5 (reverse postfn)))
-    let farity = funcArity checkfun
-        ftype  = funcType checkfun
-        targsr = zip [1..] (argTypes ftype ++ [resultType ftype])
-    bodyformula     <- extractPostConditionProofObligation
-                         [1 .. farity] (farity+1) (funcRule checkfun)
-    precondformula  <- preCondExpOf orgqn (init targsr)
-    postcondformula <- applyFunc postfun targsr >>= pred2smt
-    let title = "verify postcondition of '" ++ mainfunc ++ "'..."
-    debugM $ "Trying to " ++ title
-    vartypes <- getVarTypes
-    pcproof <- checkImplication ("SMT script to " ++ title) vartypes
-                       (tConj [precondformula, bodyformula])
-                       tTrue postcondformula
-    Cond pcname <$> maybe
-      (do infoM $ mainfunc ++ ": POSTCOND CHECK ADDED"
-          return False )
-      (\proof -> do
-         unless (optNoProof opts) $ liftIO $
-           writeFile ("PROOF_" ++ showQNameNoDots orgqn ++ "_" ++
-                      "SatisfiesPostCondition.smt") proof
-         infoM $ mainfunc ++ ": POSTCONDITION VERIFIED"
-         return True )
-      pcproof
+  let checkfun        = currentFunc env
+      (postmn,postfn) = funcName postfun
+      mainfunc        = snd (funcName checkfun)
+      orgqn           = (postmn, reverse (drop 5 (reverse postfn)))
+  let farity = funcArity checkfun
+      ftype  = funcType checkfun
+      targsr = zip [1..] (argTypes ftype ++ [resultType ftype])
+  bodyformula     <- extractPostConditionProofObligation
+                        [1 .. farity] (farity+1) (funcRule checkfun)
+  precondformula  <- preCondExpOf orgqn (init targsr)
+  postcondformula <- applyFunc postfun targsr >>= pred2smt
+  let title = "verify postcondition of '" ++ mainfunc ++ "'..."
+  debugM $ "Trying to " ++ title
+  vartypes <- getVarTypes
+  pcproof <- checkImplication ("SMT script to " ++ title) vartypes
+                      (tConj [precondformula, bodyformula])
+                      tTrue postcondformula
+  Cond pcname <$> maybe
+    (do infoM $ mainfunc ++ ": POSTCOND CHECK ADDED"
+        return False )
+    (\proof -> do
+        opts <- askOptions
+        unless (optNoProof opts) $ liftIO $
+          writeFile ("PROOF_" ++ showQNameNoDots orgqn ++ "_" ++
+                    "SatisfiesPostCondition.smt") proof
+        infoM $ mainfunc ++ ": POSTCONDITION VERIFIED"
+        return True )
+    pcproof
 
   where
     pcname = snd (funcName postfun)
@@ -280,8 +271,9 @@ extractPostConditionProofObligation args resvar
                                     (ARule ty orgargs orgexp) = do
   let exp    = rnmAllVars renameRuleVar orgexp
       rtype  = resType (length orgargs) (stripForall ty)
-  put $ makeTransState (maximum (resvar : allVars exp) + 1)
-                       ((resvar, rtype) : zip args (map snd orgargs))
+  modify $ \s -> makeTransState (maximum (resvar : allVars exp) + 1)
+                                ((resvar, rtype) : zip args (map snd orgargs))
+                                (func s)
   binding2SMT True (resvar,exp)
  where
   maxArgResult = maximum (resvar : args)
@@ -743,25 +735,37 @@ data TransEnv = TransEnv
 -- * the current assertion
 -- * a fresh variable index
 -- * a list of all introduced variables and their types:
+-- * the main/checked function
 data TransState = TransState
   { cAssertion :: Term
   , freshVar   :: Int
   , varTypes   :: [(Int,TypeExpr)]
+  , func       :: TAFuncDecl
   }
 
-makeTransState :: Int -> [(Int,TypeExpr)] -> TransState
+-- The result of the transformation process.
+data TransOutput a = TransOutput
+  { toValue      :: a
+  , toFunc       :: TAFuncDecl
+  , toAddedFuncs :: [TAFuncDecl]
+  }
+
+makeTransState :: Int -> [(Int,TypeExpr)] -> TAFuncDecl -> TransState
 makeTransState = TransState tTrue
 
-emptyTransState :: TransState
-emptyTransState = makeTransState 0 []
+defaultTransState :: TAFuncDecl -> TransState
+defaultTransState = makeTransState 0 []
 
 -- The type of the state monad contains the transformation state.
 --type TransStateM a = State TransState a
-type TransStateM = StateT TransState (ReaderT TransEnv VM)
+type TransStateM = StateT TransState (ReaderT TransEnv (WriterT [TAFuncDecl] VM))
 
--- Evaluates the trans state monad.
-evalTransStateM :: TransStateM a -> TransEnv -> VM a
-evalTransStateM m e = runReaderT (evalStateT m emptyTransState) e
+-- Runs the trans state monad, returning the value, the transformed function and
+-- any newly added function declarations.
+runTransStateM :: TransStateM a -> TransEnv -> TAFuncDecl -> VM (TransOutput a)
+runTransStateM m e fd = do
+  ((x, ts), fs) <- runWriterT (runReaderT (runStateT m (defaultTransState fd)) e)
+  return $ TransOutput x (func ts) fs
 
 -- Logs a message at the debug level.
 debugM :: String -> TransStateM ()
