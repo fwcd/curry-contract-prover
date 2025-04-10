@@ -27,7 +27,7 @@ import Contract.Names
 import Contract.Usage                    ( checkContractUsage )
 import Control.Monad.Trans.Class         ( lift )
 import Control.Monad.Trans.Reader        ( ReaderT, runReaderT, ask )
-import Control.Monad.Trans.State         ( StateT (..), get, put, evalStateT, execStateT, modify, withStateT )
+import Control.Monad.Trans.State         ( StateT (..), get, put, evalStateT, execStateT, modify, withStateT, gets )
 import Control.Monad.Trans.Writer        ( WriterT (..), runWriter, tell )
 import System.FilePath                   ( (</>) )
 import FlatCurry.Files
@@ -189,9 +189,11 @@ verifyFuncContracts opts env = do
 verifyPreCondition :: TAFuncDecl -> TransM Cond
 verifyPreCondition prefun = do
   env <- askFuncEnv
+  checkfun <- getFunc
   debugToEnv env $ "Verifying precondition " ++ pcname ++ "..."
-  -- TODO: Implement this
-  return $ Cond "" False
+  (rule', All verified) <- optPreConditionInRule (funcName checkfun) (funcRule checkfun)
+  modifyFunc $ updFuncRule (const rule')
+  return $ Cond pcname verified
   where
     pcname = snd (funcName prefun)
 
@@ -298,10 +300,9 @@ renamePatternVars (ABranch p e) =
 verifyPostCondition :: TAFuncDecl -> TransM Cond
 verifyPostCondition postfun = do
   env <- askFuncEnv
+  checkfun <- getFunc
   debugToEnv env $ "Verifying postcondition " ++ pcname ++ "..."
-  
-  let checkfun        = currentFunc env
-      (postmn,postfn) = funcName postfun
+  let (postmn,postfn) = funcName postfun
       mainfunc        = snd (funcName checkfun)
       orgqn           = (postmn, reverse (drop 5 (reverse postfn)))
   let farity = funcArity checkfun
@@ -875,19 +876,21 @@ askOptions = lift $ teOptions <$> ask
 askFuncEnv :: TransM (VTFuncEnv ContractInfo)
 askFuncEnv = lift $ teFuncEnv <$> ask
 
+-- Fetches the current the function.
+getFunc :: TransM TAFuncDecl
+getFunc = gets func
+
 -- Modifies the function.
 modifyFunc :: (TAFuncDecl -> TAFuncDecl) -> TransM ()
 modifyFunc f = modify $ \s -> s { func = f (func s) }
 
--- Modifies the function and adds new ones.
-modifyAddFuncs :: (TAFuncDecl -> (TAFuncDecl, [TAFuncDecl])) -> TransM ()
-modifyAddFuncs f = modifyM $ \s -> do
-  let (func', added) = f (func s)
-  lift $ tell added
-  return $ s { func = func' }
-  -- FIXME: Replace with upstream version once
-  -- https://github.com/curry-packages/transformers/pull/2 is merged
-  where modifyM a = StateT $ \s -> (\s' -> ((), s')) <$> a s
+-- Updates the function.
+putFunc :: TAFuncDecl -> TransM ()
+putFunc = modifyFunc . const
+
+-- Adds the given new functions.
+tellFuncs :: [TAFuncDecl] -> TransM ()
+tellFuncs = lift . lift . tell
 
 -- Gets the current fresh variable index of the state.
 getFreshVarIndex :: TransM Int
