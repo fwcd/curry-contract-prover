@@ -140,18 +140,24 @@ prepareProgContracts env = do
       snd qf ++ " (module " ++ fst qf ++ "): " ++ err
 
 --- Initializes the results for a function by finding all associated pre- and postconditions.
-initFuncContracts :: VTFuncEnv ContractInfo -> VM ContractInfo
+initFuncContracts :: VTFuncEnv ContractInfo -> VM (Maybe ContractInfo)
 initFuncContracts env = do
   fdecls <- currentProgFuncs env
 
   let name            = snd $ currentFuncName env
+      isContract      = any ($ name) [isPreCondName, isPostCondName]
       funcsMatching f = filter (== f name) $ snd . funcName <$> fdecls
       mkCond          = flip Cond False
 
-  return $ emptyContractInfo
-    { ciPreConds  = mkCond <$> funcsMatching toPreCondName
-    , ciPostConds = mkCond <$> funcsMatching toPostCondName
-    }
+  -- We filter out contracts here and only 'verify' the main functions, since
+  -- the associated pre/postconditions will be queried separately.
+
+  return $ if isContract
+    then Nothing
+    else Just $ emptyContractInfo
+      { ciPreConds  = mkCond <$> funcsMatching toPreCondName
+      , ciPostConds = mkCond <$> funcsMatching toPostCondName
+      }
 
 --- Verifies a single function declaration by proving the contracts.
 verifyFuncContracts :: Options -> VTFuncEnv ContractInfo -> VM (VTFuncUpdate ContractInfo)
