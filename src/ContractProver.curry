@@ -21,6 +21,7 @@ import Data.List          ( elemIndex, find, init, isPrefixOf, last, maximum
 import Data.Maybe         ( catMaybes, isJust, isNothing )
 import Data.Monoid        ( All (..) )
 import System.Environment ( getArgs, getEnv )
+import Text.Pretty        ( pPrint )
 
 -- Imports from dependencies:
 import Contract.Names
@@ -49,7 +50,7 @@ import Verification.Log                  ( VLevel (..), printLog, withVLevel )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.Options              ( VOptions (..), defaultVOptions )
 import Verification.Monad                ( VM, throwVM )
-import Verification.State                ( prettyVState )
+import Verification.State                ( prettyVState, ppVState )
 import Verification.Types                ( TVerification, Verification (..), emptyVerification )
 import Verification.Update               ( VFuncUpdate (..), VTFuncUpdate, VTProgUpdate, simpleVFuncUpdate, emptyVProgUpdate, emptyVFuncUpdate )
 
@@ -111,7 +112,7 @@ main = do
           result <- runTypeAnnotatedVerification (contractProver opts) vopts
           case result of
             Left e  -> putStrLn ("Verification failed: " ++ e) >> exitWith 1
-            Right s -> putStrLn $ prettyVState showContractInfo s
+            Right s -> putStrLn . pPrint $ ppVState showContractInfo s
 
 ---------------------------------------------------------------------------
 

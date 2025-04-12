@@ -3,6 +3,8 @@ module ContractInfo
   , emptyContractInfo, showContractInfo, addPreCondToInfo, addPostCondToInfo
   ) where
 
+import Text.Pretty (hcat, text, Doc)
+
 data Cond = Cond
   { cName     :: String -- The pre/postcondition's name
   , cVerified :: Bool   -- Whether the condition could be verified
@@ -22,20 +24,20 @@ emptyContractInfo = ContractInfo
   }
 
 --- Shows the statistics in human-readable format.
---- TODO: Should we use Doc for this for better alignment?
-showContractInfo :: ContractInfo -> String
-showContractInfo ci =
-  showStat "PRECONDITIONS : VERIFIED  " (verified (ciPreConds ci)) ++
-  showStat "PRECONDITIONS : UNVERIFIED" (unverified (ciPreConds ci)) ++
-  showStat "POSTCONDITIONS: VERIFIED  " (verified (ciPostConds ci)) ++
-  showStat "POSTCONDITIONS: UNVERIFIED" (unverified (ciPreConds ci)) ++
-  (if null (unverified (ciPreConds ci) ++ unverified (ciPostConds ci))
+showContractInfo :: ContractInfo -> Doc
+showContractInfo ci = hcat
+  [ showStat "PRECONDITIONS : VERIFIED  " (verified (ciPreConds ci))
+  , showStat "PRECONDITIONS : UNVERIFIED" (unverified (ciPreConds ci))
+  , showStat "POSTCONDITIONS: VERIFIED  " (verified (ciPostConds ci))
+  , showStat "POSTCONDITIONS: UNVERIFIED" (unverified (ciPreConds ci))
+  , text $ if null (unverified (ciPreConds ci) ++ unverified (ciPostConds ci))
      then "\nALL CONTRACTS VERIFIED!"
-     else "")
+     else ""
+  ]
  where
   verified      = filter cVerified
   unverified    = filter (not . cVerified)
-  showStat t fs = if null fs then "" else "\n" ++ t ++ ": " ++ unwords (cName <$> fs)
+  showStat t fs = text $ if null fs then "" else "\n" ++ t ++ ": " ++ unwords (cName <$> fs)
 
 --- Adds an operation to the already processed preconditions.
 addPreCondToInfo :: Cond -> ContractInfo -> ContractInfo
