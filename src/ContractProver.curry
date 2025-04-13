@@ -13,7 +13,7 @@
 
 module ContractProver where
 
-import Control.Monad          ( unless, when )
+import Control.Monad          ( unless, when, join, join )
 import Control.Monad.IO.Class ( liftIO )
 import Data.IORef
 import Data.List          ( elemIndex, find, init, isPrefixOf, last, maximum
@@ -115,8 +115,12 @@ main = do
             Left e  -> putStrLn ("Verification failed: " ++ e) >> exitWith 1
             Right s -> do
               putStrLn . pPrint $ ppVState showContractInfo s
-              when (null (getProgInfos s >>= getFuncInfos . snd >>= filter (not . cVerified) . allConds . snd)) $ do
-                putStrLn "ALL CONTRACTS VERIFIED!"
+              let conds   = getProgInfos s >>= getFuncInfos . snd >>= allConds . snd
+                  uvconds = filter (not . cVerified) conds
+              when (null uvconds) $
+                if null conds
+                  then putStrLn "NO CONTRACTS FOUND!"
+                  else putStrLn "ALL CONTRACTS VERIFIED!"
 
 ---------------------------------------------------------------------------
 
@@ -181,8 +185,8 @@ verifyFuncContracts opts env = do
   -- Verify associated pre/postcondition functions
   TransOutput info checkfun' addedfuns <-
     (\m -> runTransStateM m (TransEnv opts env) checkfun) $ do
-      preConds  <- mapM verifyPreCondition  prefuns
-      postConds <- mapM verifyPostCondition postfuns
+      preConds  <- join <$> mapM verifyPreCondition  prefuns
+      postConds <-          mapM verifyPostCondition postfuns
       return $ ContractInfo preConds postConds
   
   return $ emptyVFuncUpdate
@@ -197,18 +201,18 @@ verifyFuncContracts opts env = do
 -- this precondition is extracted.
 -- If the proof is not successful, a precondition check is added to this call.
 
-verifyPreCondition :: TAFuncDecl -> TransM Cond
+verifyPreCondition :: TAFuncDecl -> TransM [Cond]
 verifyPreCondition prefun = do
   env <- askFuncEnv
   checkfun <- getFunc
   debugToEnv env $ "Verifying precondition " ++ pcname ++ "..."
-  (rule', All verified) <- optPreConditionInRule (funcName checkfun) (funcRule checkfun)
+  (rule', conds) <- optPreConditionInRule (funcName checkfun) (funcRule checkfun)
   modifyFunc $ updFuncRule (const rule')
-  return $ Cond pcname verified
+  return conds
   where
     pcname = snd (funcName prefun)
 
-optPreConditionInRule :: QName -> TARule -> TransM (TARule, All)
+optPreConditionInRule :: QName -> TARule -> TransM (TARule, [Cond])
 optPreConditionInRule _ rl@(AExternal _ _) = return (rl, mempty)
 optPreConditionInRule qn@(_,fn) (ARule rty rargs rhs) = do
   let targs = zip [1..] (map snd rargs)
@@ -220,9 +224,8 @@ optPreConditionInRule qn@(_,fn) (ARule rty rargs rhs) = do
     newrhs <- optPreCondInExp rhs
     return (ARule rty rargs newrhs)
  where
-  -- We use the Writer monad with the All monoid to track whether all
-  -- preconditions in the expression could be verified.
-  optPreCondInExp :: TAExpr -> WriterT All TransM TAExpr
+  -- We use the Writer monad to collect (invocation-specific) preconditions
+  optPreCondInExp :: TAExpr -> WriterT [Cond] TransM TAExpr
   optPreCondInExp exp = case exp of
     AComb ty ct (qf,tys) args ->
       if qf == ("Prelude","?") && length args == 2
@@ -246,10 +249,10 @@ optPreConditionInRule qn@(_,fn) (ARule rty rargs rhs) = do
                 checkImplication title vartypes
                                  precond (tConj bindexps) precondcall
               let pcvalid = isJust pcproof
+              tell [Cond (snd qf ++ "(" ++ fn ++ ")") pcvalid]
               if pcvalid
                 then do
                   lift . infoM $ fn ++ ": PRECONDITION OF '" ++ snd qf ++ "': VERIFIED"
-                  tell (All True)
                   return $ AComb ty ct (toNoCheckQName qf, tys) nargs
                 else do
                   lift . infoM $ fn ++ ": PRECOND CHECK ADDED TO '" ++ snd qf ++ "'"
