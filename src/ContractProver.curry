@@ -46,16 +46,17 @@ import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
 import Verification.Env                  ( VTFuncEnv, VTProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, funcDeclFromEnv, typeDeclFromEnv, infoToEnv, debugToEnv, baseEnv )
+import Verification.Info                 ( getFuncInfos )
 import Verification.Log                  ( VLevel (..), printLog, withVLevel )
 import Verification.Run                  ( runTypeAnnotatedVerification )
 import Verification.Options              ( VOptions (..), defaultVOptions )
 import Verification.Monad                ( VM, throwVM )
-import Verification.State                ( prettyVState, ppVState )
+import Verification.State                ( prettyVState, ppVState, getProgInfos )
 import Verification.Types                ( TVerification, Verification (..), emptyVerification )
 import Verification.Update               ( VFuncUpdate (..), VTFuncUpdate, VTProgUpdate, simpleVFuncUpdate, emptyVProgUpdate, emptyVFuncUpdate )
 
 -- Imports from package modules:
-import ContractInfo             ( Cond (..), ContractInfo (..), emptyContractInfo, showContractInfo )
+import ContractInfo             ( Cond (..), ContractInfo (..), emptyContractInfo, showContractInfo, allConds, cVerified )
 import ESMT
 import Curry2SMT
 import FlatCurry.Typed.Build
@@ -112,7 +113,10 @@ main = do
           result <- runTypeAnnotatedVerification (contractProver opts) vopts
           case result of
             Left e  -> putStrLn ("Verification failed: " ++ e) >> exitWith 1
-            Right s -> putStrLn . pPrint $ ppVState showContractInfo s
+            Right s -> do
+              putStrLn . pPrint $ ppVState showContractInfo s
+              when (null (getProgInfos s >>= getFuncInfos . snd >>= filter (not . cVerified) . allConds . snd)) $ do
+                putStrLn "ALL CONTRACTS VERIFIED!"
 
 ---------------------------------------------------------------------------
 
