@@ -178,15 +178,12 @@ verifyFuncContracts opts env = do
 
   let checkfun   = currentFunc env
       name       = snd $ funcName checkfun
-      condfuns f = filter (\fd -> snd (funcName fd) == encodeContractName (f name)) allfuns
-      prefuns    = condfuns toPreCondName
-      postfuns   = condfuns toPostCondName
+      postfuns   = filter (\fd -> snd (funcName fd) == encodeContractName (toPostCondName name)) allfuns
   
-  -- Verify associated pre/postcondition functions
   TransOutput info checkfun' addedfuns <-
     (\m -> runTransStateM m (TransEnv opts env) checkfun) $ do
-      preConds  <- join <$> mapM verifyPreCondition  prefuns
-      postConds <-          mapM verifyPostCondition postfuns
+      preConds  <- provePreConditions               -- Prove any calls with preconditions in this function
+      postConds <- mapM provePostCondition postfuns -- Prove the associated postcondition of this function
       return $ ContractInfo preConds postConds
   
   return $ emptyVFuncUpdate
@@ -201,16 +198,15 @@ verifyFuncContracts opts env = do
 -- this precondition is extracted.
 -- If the proof is not successful, a precondition check is added to this call.
 
-verifyPreCondition :: TAFuncDecl -> TransM [Cond]
-verifyPreCondition prefun = do
+provePreConditions :: TransM [Cond]
+provePreConditions = do
   env <- askFuncEnv
   checkfun <- getFunc
-  debugToEnv env $ "Verifying precondition " ++ pcname ++ "..."
+  let name = snd (funcName checkfun)
+  debugToEnv env $ "Proving preconditions occuring in " ++ name ++ "..."
   (rule', conds) <- optPreConditionInRule (funcName checkfun) (funcRule checkfun)
   modifyFunc $ updFuncRule (const rule')
   return conds
-  where
-    pcname = snd (funcName prefun)
 
 optPreConditionInRule :: QName -> TARule -> TransM (TARule, [Cond])
 optPreConditionInRule _ rl@(AExternal _ _) = return (rl, mempty)
@@ -311,11 +307,11 @@ renamePatternVars (ABranch p e) =
 -- a proof for the validity of the postcondition is extracted.
 -- If the proof is not successful, a postcondition check is added to `f`.
 
-verifyPostCondition :: TAFuncDecl -> TransM Cond
-verifyPostCondition postfun = do
+provePostCondition :: TAFuncDecl -> TransM Cond
+provePostCondition postfun = do
   env <- askFuncEnv
   checkfun <- getFunc
-  debugToEnv env $ "Verifying postcondition " ++ pcname ++ "..."
+  debugToEnv env $ "Proving postcondition " ++ pcname ++ "..."
   let (postmn,postfn) = funcName postfun
       mainfunc        = snd (funcName checkfun)
       orgqn           = (postmn, reverse (drop 5 (reverse postfn)))
