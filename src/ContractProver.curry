@@ -103,8 +103,10 @@ main = do
                       | v > 0     -> VInfo
                       | otherwise -> VNone
           vopts = defaultVOptions
-                    { voModules = progs
-                    , voLog     = withVLevel vlvl printLog
+                    { voModules       = progs
+                    , voLog           = withVLevel vlvl printLog
+                    , voUnaryPrimOps  = unaryPrimOps
+                    , voBinaryPrimOps = binaryPrimOps
                     }
 
       if optLegacy opts
@@ -127,14 +129,14 @@ main = do
 --- The contract prover as a framework verification.
 contractProver :: Options -> TVerification ContractInfo
 contractProver opts = emptyVerification
-  { prepareProg  = prepareProgContracts
-  , initFuncInfo = initFuncContracts
-  , verifyFunc   = verifyFuncContracts opts
+  { vPreprocess = preprocessProgs
+  , vInit       = initFuncInfo
+  , vUpdate     = updateFuncInfo opts
   }
 
 --- Prepares a program's contracts.
-prepareProgContracts :: VTProgEnv ContractInfo -> VM VTProgUpdate
-prepareProgContracts env = do
+preprocessProgs :: VTProgEnv ContractInfo -> VM VTProgUpdate
+preprocessProgs env = do
   prog <- currentProg env
 
   let errs = checkContractUsage (progName prog)
@@ -149,8 +151,8 @@ prepareProgContracts env = do
       snd qf ++ " (module " ++ fst qf ++ "): " ++ err
 
 --- Initializes the results for a function by finding all associated pre- and postconditions.
-initFuncContracts :: VTFuncEnv ContractInfo -> VM (Maybe ContractInfo)
-initFuncContracts env = do
+initFuncInfo :: VTFuncEnv ContractInfo -> VM (Maybe ContractInfo)
+initFuncInfo env = do
   fdecls <- currentProgFuncs env
 
   let name            = snd $ currentFuncName env
@@ -169,8 +171,8 @@ initFuncContracts env = do
       }
 
 --- Verifies a single function declaration by proving the contracts.
-verifyFuncContracts :: Options -> VTFuncEnv ContractInfo -> VM (VTFuncUpdate ContractInfo)
-verifyFuncContracts opts env = do
+updateFuncInfo :: Options -> VTFuncEnv ContractInfo -> VM (VTFuncUpdate ContractInfo)
+updateFuncInfo opts env = do
   allfuns  <- currentProgFuncs env
 
   -- TODO: We should make sure the framework has simplified the functions at
