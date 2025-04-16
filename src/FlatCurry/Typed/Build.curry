@@ -18,8 +18,6 @@ import System.CurryPath ( getLoadPathForModule, lookupModuleSource
 import System.FilePath  ( (</>) )
 
 import FlatCurry.Typed.Goodies ( pre )
---import FlatCurry.Typed.Names
---import FlatCurry.Typed.Simplify
 import FlatCurry.Typed.Types
 
 infixr 9 ~>

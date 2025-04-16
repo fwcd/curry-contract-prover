@@ -21,18 +21,9 @@ import Verification.Env              ( VTBaseEnv, progsFromEnv, warnToEnv )
 
 import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
-import FlatCurry.Typed.Simplify
 import FlatCurry.Typed.Types
 import PackageConfig ( packagePath )
 import ToolOptions
-
-----------------------------------------------------------------------------
---- Reads a typed FlatCurry program together with a possible `_SPEC` program
---- (containing further contracts) and simplify some expressions
---- (see module `FlatCurry.Typed.Simplify`).
-readSimpTypedFlatCurryWithSpec :: Options -> String -> IO TAProg
-readSimpTypedFlatCurryWithSpec opts mname =
-  readTypedFlatCurryWithSpec opts mname >>= return . simpProg
 
 --- Reads a typed FlatCurry program together with a possible `_SPEC` program
 --- (containing further contracts).

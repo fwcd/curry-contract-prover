@@ -16,12 +16,20 @@ import FlatCurry.Annotated.Goodies
 
 import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
-import FlatCurry.Typed.Read ( readTypedFlatCurryWithoutForall )
-import FlatCurry.Typed.Simplify
+import FlatCurry.Typed.Read ( readTypedFlatCurryWithSpec, readTypedFlatCurryWithoutForall )
 import FlatCurry.Typed.Types
+import Legacy.FlatCurry.Typed.Simplify
 import Legacy.VerifierState
 import PackageConfig ( packagePath )
 import ToolOptions
+
+----------------------------------------------------------------------------
+--- Reads a typed FlatCurry program together with a possible `_SPEC` program
+--- (containing further contracts) and simplify some expressions
+--- (see module `FlatCurry.Typed.Simplify`).
+readSimpTypedFlatCurryWithSpec :: Options -> String -> IO TAProg
+readSimpTypedFlatCurryWithSpec opts mname =
+  readTypedFlatCurryWithSpec opts mname >>= return . simpProg
 
 ----------------------------------------------------------------------------
 --- Extract all user-defined typed FlatCurry functions that might be called

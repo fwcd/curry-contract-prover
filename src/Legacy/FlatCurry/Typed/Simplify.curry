@@ -6,7 +6,7 @@
 --- @version September 2024
 ---------------------------------------------------------------------------
 
-module FlatCurry.Typed.Simplify
+module Legacy.FlatCurry.Typed.Simplify
   ( simpProg, simpFuncDecl, simpExpr )
  where
 

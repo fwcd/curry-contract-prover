@@ -45,11 +45,14 @@ import System.CurryPath                  ( runModuleActionQuiet )
 import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
 import System.Process                    ( exitWith, system )
-import Verification.Env                  ( VTFuncEnv, VTProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, funcDeclFromEnv, typeDeclFromEnv, infoToEnv, debugToEnv, baseEnv )
+import Verification.Env                  ( VTFuncEnv, VTProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, funcDeclFromEnv, typeDeclFromEnv, infoToEnv, debugToEnv, baseEnv, getOptions )
+import Verification.FlatCurry.Annotated.Simplify
+                                         ( simpExpr )
 import Verification.Info                 ( getFuncInfos )
 import Verification.Log                  ( VLevel (..), printLog, withVLevel )
 import Verification.Run                  ( runTypeAnnotatedVerification )
-import Verification.Options              ( VOptions (..), defaultVOptions )
+
+import Verification.Options              ( VOptions (..), defaultVOptions, getSimplifyEnv )
 import Verification.Monad                ( VM, throwVM )
 import Verification.State                ( prettyVState, ppVState, getProgInfos )
 import Verification.Types                ( TVerification, Verification (..), emptyVerification )
@@ -63,7 +66,6 @@ import FlatCurry.Typed.Build
 import FlatCurry.Typed.Read
 import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
-import FlatCurry.Typed.Simplify ( simpProg, simpFuncDecl, simpExpr )
 import FlatCurry.Typed.Types
 import Legacy.ContractProver    ( proveContracts )
 import PackageConfig            ( getPackagePath )
@@ -174,9 +176,6 @@ initFuncInfo env = do
 updateFuncInfo :: Options -> VTFuncEnv ContractInfo -> VM (VTFuncUpdate ContractInfo)
 updateFuncInfo opts env = do
   allfuns  <- currentProgFuncs env
-
-  -- TODO: We should make sure the framework has simplified the functions at
-  -- this point or port over simpFuncDecl
 
   let checkfun   = currentFunc env
       name       = snd $ funcName checkfun
@@ -442,7 +441,8 @@ applyFunc fdecl targs = do
       (ARule _ orgargs orgexp) = substRule tsub (funcRule fdecl)
       exp = rnmAllVars (renameRuleVar fv orgargs) orgexp
   setFreshVarIndex (max fv (maximum (0 : args ++ allVars exp) + 1))
-  return $ simpExpr $ applyArgs exp (drop (length orgargs) args)
+  senv <- getSimplifyEnv <$> askVOptions
+  return $ simpExpr senv $ applyArgs exp (drop (length orgargs) args)
  where
   args = map fst targs
   -- renaming function for variables in original rule:
@@ -484,8 +484,9 @@ pred2smt exp = case exp of
 -- If the first argument is `False`, the expression is not strictly demanded,
 -- i.e., possible contracts of it (if it is a function call) are ignored.
 binding2SMT :: Bool -> (Int,TAExpr) -> TransM Term
-binding2SMT odemanded (oresvar,oexp) =
-  exp2smt odemanded (oresvar, simpExpr oexp)
+binding2SMT odemanded (oresvar,oexp) = do
+  senv <- getSimplifyEnv <$> askVOptions
+  exp2smt odemanded (oresvar, simpExpr senv oexp)
  where
   exp2smt demanded (resvar,exp) = case exp of
     AVar _ i -> return $ if resvar==i then tTrue
@@ -883,6 +884,10 @@ infoM msg = do
 -- Fetches the options from the environment.
 askOptions :: TransM Options
 askOptions = lift $ teOptions <$> ask
+
+-- Fetches the verification options from the environment.
+askVOptions :: TransM VOptions
+askVOptions = getOptions <$> askFuncEnv
 
 -- Fetches the function environment from the environment.
 askFuncEnv :: TransM (VTFuncEnv ContractInfo)
