@@ -1,6 +1,6 @@
 module ContractInfo
   ( Cond (..), ContractInfo (..)
-  , emptyContractInfo, showContractInfo, allConds, addPreCondToInfo, addPostCondToInfo
+  , emptyContractInfo, ppContractInfo, allConds, addPreCondToInfo, addPostCondToInfo
   ) where
 
 import Prelude hiding (empty)
@@ -25,15 +25,15 @@ emptyContractInfo = ContractInfo
   }
 
 --- Shows the statistics in human-readable format.
-showContractInfo :: ContractInfo -> Doc
-showContractInfo ci = align $ vcat
-  [ showStat "  VERIFIED"   (verified (allConds ci))
-  , showStat "UNVERIFIED" (unverified (allConds ci))
+ppContractInfo :: ContractInfo -> Doc
+ppContractInfo ci = align $ vcat
+  [ ppStat "  VERIFIED"   (verified (allConds ci))
+  , ppStat "UNVERIFIED" (unverified (allConds ci))
   ]
  where
   verified      = filter cVerified
   unverified    = filter (not . cVerified)
-  showStat t fs = if null fs then empty else text t <> text ":" <+> hsep (text . cName <$> fs)
+  ppStat t fs = if null fs then empty else text t <> text ":" <+> hsep (text . cName <$> fs)
 
 allConds :: ContractInfo -> [Cond]
 allConds ci = ciPreConds ci ++ ciPostConds ci

@@ -59,7 +59,7 @@ import Verification.Types                ( TVerification, Verification (..), emp
 import Verification.Update               ( VFuncUpdate (..), VTFuncUpdate, VTProgUpdate, simpleVFuncUpdate, emptyVProgUpdate, emptyVFuncUpdate )
 
 -- Imports from package modules:
-import ContractInfo             ( Cond (..), ContractInfo (..), emptyContractInfo, showContractInfo, allConds, cVerified )
+import ContractInfo             ( Cond (..), ContractInfo (..), emptyContractInfo, ppContractInfo, allConds, cVerified )
 import ESMT
 import Curry2SMT
 import FlatCurry.Typed.Build
@@ -118,7 +118,7 @@ main = do
           case result of
             Left e  -> putStrLn ("Verification failed: " ++ e) >> exitWith 1
             Right s -> do
-              putStrLn . pPrint $ ppVState showContractInfo s
+              putStrLn . pPrint $ ppVState ppContractInfo s
               let conds   = getProgInfos s >>= getFuncInfos . snd >>= allConds . snd
                   uvconds = filter (not . cVerified) conds
               when (null uvconds) $
