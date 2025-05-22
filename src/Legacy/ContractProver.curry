@@ -43,7 +43,7 @@ import System.Process                    ( exitWith, system )
 
 -- Imports from package modules:
 import ContractProver.ESMT as ESMT
-import ContractProver.ToolOptions
+import ContractProver.Options
 import FlatCurry.Typed.Build
 import FlatCurry.Typed.Read ( readTypedFlatCurryWithSpec, stripForall )
 import FlatCurry.Typed.Goodies

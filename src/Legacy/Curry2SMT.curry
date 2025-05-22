@@ -20,7 +20,7 @@ import FlatCurry.ShowIntMod        ( showCurryFuncDecl )
 
 -- Imports from package modules:
 import ContractProver.ESMT
-import ContractProver.ToolOptions
+import ContractProver.Options
 import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
 import FlatCurry.Typed.NonDet2Det

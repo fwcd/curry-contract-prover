@@ -19,7 +19,7 @@ import System.CurryPath              ( getLoadPathForModule, lookupModuleSource
 import System.FilePath               ( (</>) )
 import Verification.Env              ( VTBaseEnv, progsFromEnv, warnToEnv )
 
-import ContractProver.ToolOptions
+import ContractProver.Options
 import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
 import FlatCurry.Typed.Types

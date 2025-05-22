@@ -8,7 +8,7 @@ import Contract.Names ( isPreCondName, isPostCondName )
 import FlatCurry.Annotated.Goodies ( funcName, typeName, progName, progTypes )
 
 -- Imports from package modules:
-import ContractProver.ToolOptions
+import ContractProver.Options
 import FlatCurry.Typed.Types
 
 ---------------------------------------------------------------------------

@@ -15,7 +15,7 @@ import Data.Maybe        ( fromJust )
 import FlatCurry.Annotated.Goodies
 
 -- Imports from package modules:
-import ContractProver.ToolOptions
+import ContractProver.Options
 import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
 import FlatCurry.Typed.Read ( readTypedFlatCurryWithSpec, readTypedFlatCurryWithoutForall )

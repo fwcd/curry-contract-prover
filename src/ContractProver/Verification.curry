@@ -55,10 +55,10 @@ import Verification.Types                ( TVerification, Verification (..), emp
 import Verification.Update               ( VFuncUpdate (..), VTFuncUpdate, VTProgUpdate, simpleVFuncUpdate, emptyVProgUpdate, emptyVFuncUpdate )
 
 -- Imports from package modules:
-import ContractProver.ContractInfo       ( Cond (..), ContractInfo (..), emptyContractInfo, ppContractInfo, allConds, cVerified )
+import ContractProver.Info               ( Cond (..), ContractInfo (..), emptyContractInfo, ppContractInfo, allConds, cVerified )
 import ContractProver.Curry2SMT
 import ContractProver.ESMT as ESMT
-import ContractProver.ToolOptions
+import ContractProver.Options
 import FlatCurry.Typed.Build
 import FlatCurry.Typed.Read
 import FlatCurry.Typed.Goodies

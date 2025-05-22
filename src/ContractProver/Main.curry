@@ -25,8 +25,8 @@ import Verification.Run            ( runTypeAnnotatedVerification )
 import Verification.State          ( ppVState, getProgInfos )
 
 -- Imports from package modules:
-import ContractProver.ContractInfo ( ppContractInfo, allConds, cVerified )
-import ContractProver.ToolOptions
+import ContractProver.Info         ( ppContractInfo, allConds, cVerified )
+import ContractProver.Options
 import ContractProver.Verification ( contractProver )
 import Legacy.ContractProver       ( proveContracts )
 import FlatCurry.Typed.Names

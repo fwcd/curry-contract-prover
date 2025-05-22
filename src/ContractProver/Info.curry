@@ -1,4 +1,4 @@
-module ContractProver.ContractInfo
+module ContractProver.Info
   ( Cond (..), ContractInfo (..)
   , emptyContractInfo, ppContractInfo, allConds, addPreCondToInfo, addPostCondToInfo
   ) where

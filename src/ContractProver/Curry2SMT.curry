@@ -21,7 +21,7 @@ import Verification.Env            ( VTBaseEnv )
 
 -- Imports from package modules:
 import ContractProver.ESMT
-import ContractProver.ToolOptions
+import ContractProver.Options
 import FlatCurry.Typed.Read    ( getAllFunctions )
 import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
