@@ -28,7 +28,7 @@
     "configModule": "PackageConfig",
     "executable": {
         "name": "curry-contracts",
-        "main": "ContractProver"
+        "main": "ContractProver.Main"
     },
     "testsuite": {
         "src-dir": "examples",

@@ -14,6 +14,8 @@ import Data.Maybe        ( fromJust )
 -- Imports from dependencies:
 import FlatCurry.Annotated.Goodies
 
+-- Imports from package modules:
+import ContractProver.ToolOptions
 import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
 import FlatCurry.Typed.Read ( readTypedFlatCurryWithSpec, readTypedFlatCurryWithoutForall )
@@ -21,7 +23,6 @@ import FlatCurry.Typed.Types
 import Legacy.FlatCurry.Typed.Simplify
 import Legacy.VerifierState
 import PackageConfig ( packagePath )
-import ToolOptions
 
 ----------------------------------------------------------------------------
 --- Reads a typed FlatCurry program together with a possible `_SPEC` program

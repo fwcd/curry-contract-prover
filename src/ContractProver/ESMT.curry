@@ -10,7 +10,7 @@
 --- @version November 2020
 ------------------------------------------------------------------------------
 
-module ESMT where
+module ContractProver.ESMT where
 
 import Data.List ( (\\), intercalate, isPrefixOf, union )
 

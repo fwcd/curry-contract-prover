@@ -19,11 +19,11 @@ import System.CurryPath              ( getLoadPathForModule, lookupModuleSource
 import System.FilePath               ( (</>) )
 import Verification.Env              ( VTBaseEnv, progsFromEnv, warnToEnv )
 
+import ContractProver.ToolOptions
 import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
 import FlatCurry.Typed.Types
 import PackageConfig ( packagePath )
-import ToolOptions
 
 --- Reads a typed FlatCurry program together with a possible `_SPEC` program
 --- (containing further contracts).

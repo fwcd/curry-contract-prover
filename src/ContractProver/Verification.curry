@@ -1,9 +1,10 @@
 ---------------------------------------------------------------------------
---- A tool to prove pre- or postconditions via an SMT solver (Z3)
---- and to remove the statically proven conditions from a program.
+--- A framework-based verification for proving pre- or postconditions via
+--- an SMT solver (Z3) and to remove statically proven conditions from a
+--- program.
 ---
 --- @author  Michael Hanus
---- @version October 2024
+--- @version May 2025
 ---------------------------------------------------------------------------
 -- A few things to be done to improve contract checking:
 --
@@ -11,13 +12,13 @@
 --   in order to generate correct SMT formulas
 ---------------------------------------------------------------------------
 
-module ContractProver where
+module ContractProver.Verification ( contractProver ) where
 
 import Control.Monad          ( unless, when, join, join )
 import Control.Monad.IO.Class ( liftIO )
 import Data.IORef
 import Data.List          ( elemIndex, find, init, isPrefixOf, last, maximum
-                          , minimum, nub, partition, splitOn, union )
+                          , minimum, nub, partition, union )
 import Data.Maybe         ( catMaybes, isJust, isNothing )
 import Data.Monoid        ( All (..) )
 import System.Environment ( getArgs, getEnv )
@@ -44,87 +45,26 @@ import FlatCurry.ShowIntMod              ( showCurryModule )
 import System.CurryPath                  ( runModuleActionQuiet )
 import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
-import System.Process                    ( exitWith, system )
 import Verification.Env                  ( VTFuncEnv, VTProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, funcDeclFromEnv, typeDeclFromEnv, infoToEnv, debugToEnv, baseEnv, getOptions )
 import Verification.FlatCurry.Annotated.Simplify
                                          ( simpExpr )
-import Verification.Info                 ( getFuncInfos )
-import Verification.Log                  ( VLevel (..), printLog, withVLevel )
-import Verification.Run                  ( runTypeAnnotatedVerification )
 
 import Verification.Options              ( VOptions (..), defaultVOptions, getSimplifyEnv )
 import Verification.Monad                ( VM, throwVM )
-import Verification.State                ( prettyVState, ppVState, getProgInfos )
 import Verification.Types                ( TVerification, Verification (..), emptyVerification )
 import Verification.Update               ( VFuncUpdate (..), VTFuncUpdate, VTProgUpdate, simpleVFuncUpdate, emptyVProgUpdate, emptyVFuncUpdate )
 
 -- Imports from package modules:
-import ContractInfo             ( Cond (..), ContractInfo (..), emptyContractInfo, ppContractInfo, allConds, cVerified )
-import ESMT
-import Curry2SMT
+import ContractProver.ContractInfo       ( Cond (..), ContractInfo (..), emptyContractInfo, ppContractInfo, allConds, cVerified )
+import ContractProver.Curry2SMT
+import ContractProver.ESMT as ESMT
+import ContractProver.ToolOptions
 import FlatCurry.Typed.Build
 import FlatCurry.Typed.Read
 import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
 import FlatCurry.Typed.Types
-import Legacy.ContractProver    ( proveContracts )
 import PackageConfig            ( getPackagePath )
-import ToolOptions
-
-------------------------------------------------------------------------
-
-banner :: String
-banner = unlines [bannerLine, bannerText, bannerLine]
- where
-  bannerText = "Contract Checking/Verification Tool (Verification Framework Alpha)"
-  bannerLine = take (length bannerText) (repeat '=')
-
----------------------------------------------------------------------------
-
-main :: IO ()
-main = do
-  args <- getArgs
-  (opts,progs) <- processOptions banner args
-  let optname = optName opts
-  if not (null optname)
-    then putStrLn $ "Precondition for '" ++ optname ++ "':\n" ++
-                    encodeContractName (toPreCondName optname) ++ "\n" ++
-                    "Postcondition for '" ++ optname ++ "':\n" ++
-                    encodeContractName (toPostCondName optname)
-    else do
-      when (optVerb opts > 0) $ putStrLn banner
-      z3exists <- fileInPath "z3"
-      unless (z3exists || not (optVerify opts)) $ putStrLn $ unlines $
-        [ "WARNING: CONTRACT VERIFICATION SKIPPED:"
-        , "The SMT solver Z3 is required for the verifier"
-        , "but the program 'z3' is not found in the PATH!"]
-      let opts' = if z3exists then opts else opts { optVerify = False }
-          vlvl  = case optVerb opts of
-                    v | v > 2     -> VAll
-                      | v > 1     -> VDebug
-                      | v > 0     -> VInfo
-                      | otherwise -> VNone
-          vopts = defaultVOptions
-                    { voModules       = progs
-                    , voLog           = withVLevel vlvl printLog
-                    , voUnaryPrimOps  = unaryPrimOps
-                    , voBinaryPrimOps = binaryPrimOps
-                    }
-
-      if optLegacy opts
-        then mapM_ (proveContracts opts') progs
-        else do
-          result <- runTypeAnnotatedVerification (contractProver opts) vopts
-          case result of
-            Left e  -> putStrLn ("Verification failed: " ++ e) >> exitWith 1
-            Right s -> do
-              putStrLn . pPrint $ ppVState ppContractInfo s
-              let conds   = getProgInfos s >>= getFuncInfos . snd >>= allConds . snd
-                  uvconds = filter (not . cVerified) conds
-              when (null uvconds) $
-                if null conds
-                  then putStrLn "NO CONTRACTS FOUND!"
-                  else putStrLn "ALL CONTRACTS VERIFIED!"
 
 ---------------------------------------------------------------------------
 
@@ -986,12 +926,7 @@ showWithLineNums txt =
       showNum n = (take (maxlog - ilog n) (repeat ' ')) ++ show n ++ ": "
   in unlines . map (uncurry (++)) . zip (map showNum [1..]) $ txtlines
 
---- Checks whether a file exists in one of the directories on the PATH.
-fileInPath :: String -> IO Bool
-fileInPath file = do
-  path <- getEnv "PATH"
-  dirs <- return $ splitOn ":" path
-  (fmap (any id)) $ mapM (doesFileExist . (</> file)) dirs
+
 
 ---------------------------------------------------------------------------
 --- The value of `ilog n` is the floor of the logarithm

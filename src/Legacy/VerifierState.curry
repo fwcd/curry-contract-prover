@@ -3,11 +3,13 @@ module Legacy.VerifierState where
 import Data.IORef
 import Data.List  ( find )
 
+-- Imports from dependencies:
 import Contract.Names ( isPreCondName, isPostCondName )
 import FlatCurry.Annotated.Goodies ( funcName, typeName, progName, progTypes )
 
+-- Imports from package modules:
+import ContractProver.ToolOptions
 import FlatCurry.Typed.Types
-import ToolOptions
 
 ---------------------------------------------------------------------------
 -- Some global information used by the transformation process:

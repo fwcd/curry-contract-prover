@@ -19,12 +19,12 @@ import FlatCurry.Types             ( showQName )
 import FlatCurry.ShowIntMod        ( showCurryFuncDecl )
 
 -- Imports from package modules:
-import ESMT
+import ContractProver.ESMT
+import ContractProver.ToolOptions
 import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
 import FlatCurry.Typed.NonDet2Det
 import FlatCurry.Typed.Types
-import ToolOptions
 import Legacy.FlatCurry.Typed.Read    ( getAllFunctions )
 import Legacy.VerifierState
 

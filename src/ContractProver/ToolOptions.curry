@@ -6,7 +6,7 @@
 --- @version October 2021
 -------------------------------------------------------------------------
 
-module ToolOptions
+module ContractProver.ToolOptions
   ( Options(..), defaultOptions, processOptions
   , printWhenStatus, printWhenIntermediate, printWhenAll
   )

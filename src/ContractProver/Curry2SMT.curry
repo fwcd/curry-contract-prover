@@ -5,7 +5,7 @@
 --- @version May 2021
 ---------------------------------------------------------------------------
 
-module Curry2SMT where
+module ContractProver.Curry2SMT where
 
 import Control.Monad ( unless )
 import Data.IORef
@@ -20,13 +20,13 @@ import FlatCurry.ShowIntMod        ( showCurryFuncDecl )
 import Verification.Env            ( VTBaseEnv )
 
 -- Imports from package modules:
-import ESMT
+import ContractProver.ESMT
+import ContractProver.ToolOptions
 import FlatCurry.Typed.Read    ( getAllFunctions )
 import FlatCurry.Typed.Goodies
 import FlatCurry.Typed.Names
 import FlatCurry.Typed.NonDet2Det
 import FlatCurry.Typed.Types
-import ToolOptions
 import Legacy.VerifierState
 
 --- Translates a list of operations specified by their qualified name
