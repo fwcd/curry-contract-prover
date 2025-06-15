@@ -10,6 +10,7 @@ data Cond = Cond
   { cName     :: String -- The pre/postcondition's name
   , cVerified :: Bool   -- Whether the condition could be verified
   }
+  deriving (Show, Eq)
 
 -- TODO: Should we rename the type (and module, functions, ...) to ContractStats?
 
@@ -17,6 +18,7 @@ data ContractInfo = ContractInfo
   { ciPreConds  :: [Cond] -- The contract's preconditions
   , ciPostConds :: [Cond] -- The contract's postconditions
   }
+  deriving (Show, Eq)
 
 emptyContractInfo :: ContractInfo
 emptyContractInfo = ContractInfo

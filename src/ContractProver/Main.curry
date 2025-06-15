@@ -60,10 +60,10 @@ main = do
         , "but the program 'z3' is not found in the PATH!"]
       let opts' = if z3exists then opts else opts { optVerify = False }
           vlvl  = case optVerb opts of
-                    v | v > 2     -> VAll
-                      | v > 1     -> VDebug
-                      | v > 0     -> VInfo
-                      | otherwise -> VNone
+                    v | v > 2     -> VLevelAll
+                      | v > 1     -> VLevelDebug
+                      | v > 0     -> VLevelInfo
+                      | otherwise -> VLevelNone
           vopts = defaultVOptions
                     { voModules       = progs
                     , voLog           = withVLevel vlvl printLog
