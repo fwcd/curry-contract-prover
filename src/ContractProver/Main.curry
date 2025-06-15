@@ -69,6 +69,7 @@ main = do
                     , voLog           = withVLevel vlvl printLog
                     , voUnaryPrimOps  = unaryPrimOps
                     , voBinaryPrimOps = binaryPrimOps
+                    , voSkipPrelude   = True
                     }
 
       if optLegacy opts
