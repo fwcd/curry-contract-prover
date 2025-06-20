@@ -65,7 +65,8 @@ main = do
                       | v > 0     -> VLevelInfo
                       | otherwise -> VLevelNone
           vopts = defaultVOptions
-                    { voModules       = progs
+                    { voName          = Just "ContractProver"
+                    , voModules       = progs
                     , voLog           = withVLevel vlvl printLog
                     , voUnaryPrimOps  = unaryPrimOps
                     , voBinaryPrimOps = binaryPrimOps
