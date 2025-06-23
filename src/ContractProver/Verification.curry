@@ -71,14 +71,14 @@ import PackageConfig            ( getPackagePath )
 --- The contract prover as a framework verification.
 contractProver :: Options -> TVerification ContractInfo
 contractProver opts = emptyVerification
-  { vPreprocess = preprocessProgs
+  { vPreprocess = preprocessProg
   , vInit       = initFuncInfo
   , vUpdate     = updateFuncInfo opts
   }
 
 --- Prepares a program's contracts.
-preprocessProgs :: VTProgEnv ContractInfo -> VM VTProgUpdate
-preprocessProgs env = do
+preprocessProg :: VTProgEnv ContractInfo -> VM VTProgUpdate
+preprocessProg env = do
   prog <- currentProg env
 
   let errs = checkContractUsage (progName prog)
