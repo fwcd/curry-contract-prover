@@ -153,8 +153,7 @@ optPreConditionInRule :: QName -> TARule -> TransM (TARule, [Cond])
 optPreConditionInRule _ rl@(AExternal _ _) = return (rl, mempty)
 optPreConditionInRule qn@(_,fn) (ARule rty rargs rhs) = do
   let targs = zip [1..] (map snd rargs)
-  st <- derivedTransState (maximum (0 : map fst rargs ++ allVars rhs) + 1) rargs
-  withTransState st . runWriterT $ do
+  useDerivedTransState (maximum (0 : map fst rargs ++ allVars rhs) + 1) rargs . runWriterT $ do
     -- compute precondition of operation:
     precondformula <- lift $ preCondExpOf qn targs
     lift $ setAssertion precondformula
@@ -320,9 +319,8 @@ extractPostConditionProofObligation args resvar
                                     (ARule ty orgargs orgexp) = do
   let exp    = rnmAllVars renameRuleVar orgexp
       rtype  = resType (length orgargs) (stripForall ty)
-  derivedTransState (maximum (resvar : allVars exp) + 1)
-                    ((resvar, rtype) : zip args (map snd orgargs))
-                    >>= put
+  putFreshVarsAndTys (maximum (resvar : allVars exp) + 1)
+                     ((resvar, rtype) : zip args (map snd orgargs))
   binding2SMT True (resvar,exp)
  where
   maxArgResult = maximum (resvar : args)
@@ -799,15 +797,18 @@ runTransStateM m e fd = do
 liftVM :: VM a -> TransM a
 liftVM = lift . lift . lift
 
--- Creates a state with the same function and updated fresh vars/types.
-derivedTransState :: Int -> [(Int,TypeExpr)] -> TransM TransState
-derivedTransState fv vts = do
+-- Updates the state with the given fresh vars/types.
+putFreshVarsAndTys :: Int -> [(Int,TypeExpr)] -> TransM ()
+putFreshVarsAndTys fv vts = do
   s <- get
-  return $ makeTransState fv vts (func s)
+  put $ makeTransState fv vts (func s)
 
--- Runs a subcomputation with the given state.
-withTransState :: TransState -> TransM a -> TransM a
-withTransState = withStateT . const
+-- Runs a subcomputation using the same function and updated fresh vars/types.
+useDerivedTransState :: Int -> [(Int,TypeExpr)] -> TransM a -> TransM a
+useDerivedTransState fv vts m = do
+  s <- get
+  let ds = makeTransState fv vts (func s)
+  lift $ evalStateT m ds
 
 -- Logs a message at the debug level.
 debugM :: String -> TransM ()
