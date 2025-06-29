@@ -1,4 +1,4 @@
-; SMT script to verify precondition of 'fac' in function 'fac'
+; SMT script to verify precondition of 'fac' in function 'f'
 
 ; disable model-based quantifier instantiation (avoid loops)
 (set-option :smt.mbqi false)
@@ -13,19 +13,15 @@
 
 
 ; Free variables:
-(declare-const x7 Int)
-(declare-const x6 Int)
-(declare-const x2 Bool)
-(declare-const x3 Int)
 
 ; Boolean formula of assertion (known properties):
-(assert (and (>= x1 0) (= x3 0) (= x2 (= x1 x3)) (= x2 true) (= x2 false)))
+(assert true)
 
 ; Bindings of implication:
-(assert (and (= x7 1) (= x6 (- x1 x7))))
+(assert true)
 
 ; Assert negated implication:
-(assert (not (>= x6 0)))
+(assert (not (>= x1 0)))
 
 ; check satisfiability:
 (check-sat)
