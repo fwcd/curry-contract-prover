@@ -20,7 +20,7 @@ import System.Process              ( exitWith )
 import Text.Pretty                 ( pPrint )
 import Verification.Info           ( getFuncInfos )
 import Verification.Log            ( VLevel (..), printLog, withVLevel )
-import Verification.Options        ( VOptions (..), defaultVOptions, getSimplifyEnv )
+import Verification.Options        ( VOptions (..), buildVOptions, getSimplifyEnv )
 import Verification.Run            ( runTypeAnnotatedVerification )
 import Verification.State          ( ppVState, getProgInfos )
 
@@ -64,14 +64,14 @@ main = do
                       | v > 1     -> VLevelDebug
                       | v > 0     -> VLevelInfo
                       | otherwise -> VLevelNone
-          vopts = defaultVOptions
-                    { voName          = Just "ContractProver"
-                    , voModules       = progs
-                    , voLog           = withVLevel vlvl printLog
-                    , voUnaryPrimOps  = unaryPrimOps
-                    , voBinaryPrimOps = binaryPrimOps
-                    , voSkipPrelude   = True
-                    }
+
+      vopts <- buildVOptions "ContractProver" $ \o -> o
+        { voModules       = progs
+        , voLog           = withVLevel vlvl printLog
+        , voUnaryPrimOps  = unaryPrimOps
+        , voBinaryPrimOps = binaryPrimOps
+        , voSkipPrelude   = True
+        }
 
       if optLegacy opts
         then mapM_ (proveContracts opts') progs
