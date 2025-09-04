@@ -66,11 +66,13 @@ main = do
                       | otherwise -> VLevelNone
 
       vopts <- buildVOptions "ContractProver" $ \o -> o
-        { voModules       = progs
-        , voLog           = withVLevel vlvl printLog
-        , voUnaryPrimOps  = unaryPrimOps
-        , voBinaryPrimOps = binaryPrimOps
-        , voSkipPrelude   = True
+        { voModules           = progs
+        , voLog               = withVLevel vlvl printLog
+        , voUnaryPrimOps      = unaryPrimOps
+        , voBinaryPrimOps     = binaryPrimOps
+        , voSkipPrelude       = True
+        , voWriteProgs        = optTAFCY opts
+        , voWriteUntypedProgs = optFCY opts
         }
 
       if optLegacy opts
