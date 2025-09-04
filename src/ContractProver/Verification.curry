@@ -827,7 +827,7 @@ askOptions :: TransM Options
 askOptions = lift $ teOptions <$> ask
 
 -- Fetches the verification options from the environment.
-askVOptions :: TransM VOptions
+askVOptions :: TransM (VOptions ContractInfo)
 askVOptions = getOptions <$> askFuncEnv
 
 -- Fetches the function environment from the environment.
