@@ -15,8 +15,8 @@ data Cond = Cond
 -- TODO: Should we rename the type (and module, functions, ...) to ContractStats?
 
 data ContractInfo = ContractInfo
-  { ciPreConds  :: [Cond] -- The contract's preconditions
-  , ciPostConds :: [Cond] -- The contract's postconditions
+  { ciPreConds  :: [Cond] -- The function's preconditions
+  , ciPostConds :: [Cond] -- The function's postconditions
   }
   deriving (Read, Show, Eq)
 
