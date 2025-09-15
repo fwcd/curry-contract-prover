@@ -49,7 +49,7 @@ import Verification.Env                  ( VTFuncEnv, VTProgEnv, currentProg, cu
 import Verification.FlatCurry.Annotated.Simplify
                                          ( simpExpr )
 
-import Verification.Options              ( VOptions (..), defaultVOptions, getSimplifyEnv )
+import Verification.Options              ( VOptions (..), getSimplifyEnv )
 import Verification.Monad                ( VM, throwVM )
 import Verification.Types                ( TVerification, Verification (..), emptyVerification )
 import Verification.Update               ( VFuncUpdate (..), VTFuncUpdate, VTProgUpdate, simpleVFuncUpdate, emptyVProgUpdate, emptyVFuncUpdate )

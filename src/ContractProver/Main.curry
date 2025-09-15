@@ -71,6 +71,7 @@ main = do
         , voUnaryPrimOps      = unaryPrimOps
         , voBinaryPrimOps     = binaryPrimOps
         , voSkipPrelude       = True
+        , voUseOriginalFuncs  = True
         , voWriteProgs        = optTAFCY opts
         , voWriteUntypedProgs = optFCY opts
         }
