@@ -3,3 +3,4 @@
 .cpm
 src/PackageConfig.curry
 examples/**/PROOF*
+examples/**/error.smt
