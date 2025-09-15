@@ -45,7 +45,7 @@ import FlatCurry.ShowIntMod              ( showCurryModule )
 import System.CurryPath                  ( runModuleActionQuiet )
 import System.Directory                  ( doesFileExist )
 import System.IOExts                     ( evalCmd )
-import Verification.Env                  ( VTFuncEnv, VTProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, funcDeclFromEnv, typeDeclFromEnv, infoToEnv, debugToEnv, baseEnv, getOptions )
+import Verification.Env                  ( VTFuncEnv, VTProgEnv, currentProg, currentFuncInfo, currentFunc, currentFuncName, currentProgFuncs, currentOriginalProgFuncs, funcDeclFromEnv, typeDeclFromEnv, infoToEnv, debugToEnv, baseEnv, getOptions )
 import Verification.FlatCurry.Annotated.Simplify
                                          ( simpExpr )
 
@@ -95,7 +95,7 @@ preprocessProg env = do
 --- Initializes the results for a function by finding all associated pre- and postconditions.
 initFuncInfo :: VTFuncEnv ContractInfo -> VM (Maybe ContractInfo)
 initFuncInfo env = do
-  fdecls <- currentProgFuncs env
+  fdecls <- currentOriginalProgFuncs env
 
   let name            = snd $ currentFuncName env
       isContract      = any ($ name) [isPreCondName, isPostCondName]
@@ -115,7 +115,7 @@ initFuncInfo env = do
 --- Verifies a single function declaration by proving the contracts.
 updateFuncInfo :: Options -> VTFuncEnv ContractInfo -> VM (VTFuncUpdate ContractInfo)
 updateFuncInfo opts env = do
-  allfuns  <- currentProgFuncs env
+  allfuns  <- currentOriginalProgFuncs env
 
   let checkfun   = currentFunc env
       name       = snd $ funcName checkfun
@@ -169,7 +169,7 @@ optPreConditionInRule qn@(_,fn) (ARule rty rargs rhs) = do
         else do
           precond <- lift getAssertion
           nargs <- mapM optPreCondInExp args
-          allPreConds <- map funcName <$> lift currentProgPreConds
+          allPreConds <- map funcName <$> lift currentOriginalProgPreConds
           if toPreCondQName qf `elem` allPreConds
             then do
               lift . debugM $ "Checking call to " ++ snd qf
@@ -336,10 +336,10 @@ extractPostConditionProofObligation args resvar
              _             -> error $ "Internal errror: resType: " ++ show te
 
 -- Fetches all preconditions in the current module.
-currentProgPreConds :: TransM [TAFuncDecl]
-currentProgPreConds = do
+currentOriginalProgPreConds :: TransM [TAFuncDecl]
+currentOriginalProgPreConds = do
   env <- askFuncEnv
-  fdecls <- liftVM $ currentProgFuncs env
+  fdecls <- liftVM $ currentOriginalProgFuncs env
   return $ filter (isPreCondName . snd . funcName) fdecls
 
 -- Returns the precondition expression for a given operation
