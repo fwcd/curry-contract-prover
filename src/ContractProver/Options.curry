@@ -25,6 +25,7 @@ data Options = Options
   , optHelp    :: Bool   -- if help info should be printed
   , optName    :: String -- show only the name of a nonfail condition
   , optVerify  :: Bool   -- verify contracts (or just add them)?
+  , optJSON    :: Bool   -- output JSON
   , optFCY     :: Bool   -- replace FlatCurry program?
   , optTAFCY   :: Bool   -- replace type-annotated FlatCurry program?
   , optStrict  :: Bool   -- verify precondition w.r.t. strict evaluation?
@@ -44,6 +45,7 @@ defaultOptions = Options
   , optHelp    = False
   , optName    = ""
   , optVerify  = True
+  , optJSON    = False
   , optFCY     = True
   , optTAFCY   = False
   , optStrict  = False
@@ -83,6 +85,8 @@ options =
            "do not verify contracts, just add contract checks"
   , Option "s" ["strict"] (NoArg (\opts -> opts { optStrict = True }))
            "check contracts w.r.t. strict evaluation strategy"
+  , Option "j" ["json"] (NoArg (\opts -> opts { optJSON = True }))
+           "outputs the results as JSON"
   , Option "l" ["legacy"] (NoArg (\opts -> opts { optLegacy = True }))
            "use the legacy (non-framework) implementation"
   , Option "t" ["target"]

@@ -22,7 +22,7 @@ import Verification.Info           ( getFuncInfos )
 import Verification.Log            ( VLevel (..), printLog, withVLevel )
 import Verification.Options        ( VOptions (..), buildVOptions, getSimplifyEnv )
 import Verification.Run            ( runTypeAnnotatedVerification )
-import Verification.State          ( ppVState, getProgInfos )
+import Verification.State          ( ppVState, getProgInfos, vStateToJSON )
 
 -- Imports from package modules:
 import ContractProver.Info         ( ppContractInfo, allConds, cVerified )
@@ -83,10 +83,12 @@ main = do
           case result of
             Left e  -> putStrLn ("Verification failed: " ++ e) >> exitWith 1
             Right s -> do
-              putStrLn . pPrint $ ppVState ppContractInfo s
+              if optJSON opts
+                then putStrLn $ vStateToJSON (pPrint . ppContractInfo) s
+                else putStrLn . pPrint $ ppVState ppContractInfo s
               let conds   = getProgInfos s >>= getFuncInfos . snd >>= allConds . snd
                   uvconds = filter (not . cVerified) conds
-              when (null uvconds) $
+              when (null uvconds && not (optJSON opts)) $
                 if null conds
                   then putStrLn "NO CONTRACTS FOUND!"
                   else putStrLn "ALL CONTRACTS VERIFIED!"
