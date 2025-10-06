@@ -73,6 +73,7 @@ main = do
         , voSkipPrelude       = optSkipPrelude opts
         , voCacheEnabled      = optCache opts
         , voCacheKeys         = ["v1"]
+        , voEnforceNF         = True
         , voUseOriginalFuncs  = True
         , voWriteProgs        = optTAFCY opts
         , voWriteUntypedProgs = optFCY opts
