@@ -39,7 +39,18 @@ data Options = Options
   }
 
 defaultOptions :: Options
-defaultOptions = Options 1 False "" True True False False False 4 False
+defaultOptions = Options
+  { optVerb    = 1
+  , optHelp    = False
+  , optName    = ""
+  , optVerify  = True
+  , optFCY     = True
+  , optTAFCY   = False
+  , optStrict  = False
+  , optNoProof = False
+  , optTimeout = 4
+  , optLegacy  = False
+  }
 
 --- Process the actual command line argument and return the options
 --- and the name of the main program.
