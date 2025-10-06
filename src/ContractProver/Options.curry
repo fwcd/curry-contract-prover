@@ -38,6 +38,7 @@ data Options = Options
                              -- only helpful if the Prelude is not needed)
   , optNoProof     :: Bool   -- do not write scripts of successful proofs
   , optTimeout     :: Int    -- timeout (in seconds) for SMT prover
+  , optCache       :: Bool   -- enable caching of verification results
   , optLegacy      :: Bool   -- use the legacy, non-framework contract-prover
   }
 
@@ -54,6 +55,7 @@ defaultOptions = Options
   , optSkipPrelude = False
   , optNoProof     = False
   , optTimeout     = 4
+  , optCache       = False
   , optLegacy      = False
   }
 
@@ -102,6 +104,8 @@ options =
            (ReqArg (safeReadNat (\n opts -> opts { optTimeout = n })) "<n>")
            ("timeout for SMT prover (default: " ++
             show (optTimeout defaultOptions) ++ "s)")
+  , Option "c" ["cache"] (NoArg (\opts -> opts { optCache = True }))
+           "cache verification results via the framework"
   , Option "k" ["skip-prelude"] (NoArg (\opts -> opts { optSkipPrelude = True }))
            "skip the Prelude"
   , Option "" ["noproof"] (NoArg (\opts -> opts { optNoProof = True }))
