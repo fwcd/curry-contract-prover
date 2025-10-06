@@ -21,40 +21,40 @@ import System.Process        ( exitWith )
 import System.CurryPath      ( stripCurrySuffix )
 
 data Options = Options
-  { optVerb      :: Int    -- verbosity (0: quiet, 1: status, 2: interm, 3: all)
-  , optHelp      :: Bool   -- if help info should be printed
-  , optName      :: String -- show only the name of a nonfail condition
-  , optVerify    :: Bool   -- verify contracts (or just add them)?
-  , optJSON      :: Bool   -- output JSON
-  , optFCY       :: Bool   -- replace FlatCurry program?
-  , optTAFCY     :: Bool   -- replace type-annotated FlatCurry program?
-  , optStrict    :: Bool   -- verify precondition w.r.t. strict evaluation?
-                           -- in this case, we assume that all operations are
-                           -- strictly evaluated which might give better results
-                           -- but not not be correct if some argument is not
-                           -- demanded (TODO: add demand analysis to make it
-                           -- safe and powerful)
-  , optNoPrelude :: Bool   -- skip verification of the Prelude (faster, but
-                           -- only helpful if the Prelude is not needed)
-  , optNoProof   :: Bool   -- do not write scripts of successful proofs
-  , optTimeout   :: Int    -- timeout (in seconds) for SMT prover
-  , optLegacy    :: Bool   -- use the legacy, non-framework contract-prover
+  { optVerb        :: Int    -- verbosity (0: quiet, 1: status, 2: interm, 3: all)
+  , optHelp        :: Bool   -- if help info should be printed
+  , optName        :: String -- show only the name of a nonfail condition
+  , optVerify      :: Bool   -- verify contracts (or just add them)?
+  , optJSON        :: Bool   -- output JSON
+  , optFCY         :: Bool   -- replace FlatCurry program?
+  , optTAFCY       :: Bool   -- replace type-annotated FlatCurry program?
+  , optStrict      :: Bool   -- verify precondition w.r.t. strict evaluation?
+                             -- in this case, we assume that all operations are
+                             -- strictly evaluated which might give better results
+                             -- but not not be correct if some argument is not
+                             -- demanded (TODO: add demand analysis to make it
+                             -- safe and powerful)
+  , optSkipPrelude :: Bool   -- skip verification of the Prelude (faster, but
+                             -- only helpful if the Prelude is not needed)
+  , optNoProof     :: Bool   -- do not write scripts of successful proofs
+  , optTimeout     :: Int    -- timeout (in seconds) for SMT prover
+  , optLegacy      :: Bool   -- use the legacy, non-framework contract-prover
   }
 
 defaultOptions :: Options
 defaultOptions = Options
-  { optVerb      = 1
-  , optHelp      = False
-  , optName      = ""
-  , optVerify    = True
-  , optJSON      = False
-  , optFCY       = True
-  , optTAFCY     = False
-  , optStrict    = False
-  , optNoPrelude = False
-  , optNoProof   = False
-  , optTimeout   = 4
-  , optLegacy    = False
+  { optVerb        = 1
+  , optHelp        = False
+  , optName        = ""
+  , optVerify      = True
+  , optJSON        = False
+  , optFCY         = True
+  , optTAFCY       = False
+  , optStrict      = False
+  , optSkipPrelude = False
+  , optNoProof     = False
+  , optTimeout     = 4
+  , optLegacy      = False
   }
 
 --- Process the actual command line argument and return the options
@@ -102,7 +102,7 @@ options =
            (ReqArg (safeReadNat (\n opts -> opts { optTimeout = n })) "<n>")
            ("timeout for SMT prover (default: " ++
             show (optTimeout defaultOptions) ++ "s)")
-  , Option "n" ["noprelude"] (NoArg (\opts -> opts { optNoPrelude = True }))
+  , Option "k" ["skip-prelude"] (NoArg (\opts -> opts { optSkipPrelude = True }))
            "skip the Prelude"
   , Option "" ["noproof"] (NoArg (\opts -> opts { optNoProof = True }))
            "do not write scripts of successful proofs"
