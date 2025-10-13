@@ -73,7 +73,7 @@ contractProver :: Options -> TVerification ContractInfo
 contractProver opts = emptyVerification
   { vPreprocess = preprocessProg
   , vInit       = initFuncInfo
-  , vUpdate     = updateFuncInfo opts
+  , vAnalyze    = analyzeFuncInfo opts
   }
 
 --- Prepares a program's contracts.
@@ -113,8 +113,8 @@ initFuncInfo env = do
       }
 
 --- Verifies a single function declaration by proving the contracts.
-updateFuncInfo :: Options -> VTFuncEnv ContractInfo -> VM (VTFuncUpdate ContractInfo)
-updateFuncInfo opts env = do
+analyzeFuncInfo :: Options -> VTFuncEnv ContractInfo -> VM (VTFuncUpdate ContractInfo)
+analyzeFuncInfo opts env = do
   allfuns  <- currentOriginalProgFuncs env
 
   let checkfun   = currentFunc env
